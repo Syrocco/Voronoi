@@ -22,7 +22,7 @@
 //#define JCV_FLT_MAX 1.7976931348623157E+308
 #include "jc_voronoi.h"
 
-#define NPOINT 30
+#define NPOINT 3000
 
 int main(int argc, char** argv) {
   (void)argc;

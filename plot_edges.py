@@ -4,6 +4,7 @@ def read_edges(filename):
     edges = set()
     X = []
     Y = []
+    print("Starting reading edges and points")
     with open(filename, 'r') as file:
         lines = file.readlines()
         N = int(lines[0])
@@ -16,6 +17,7 @@ def read_edges(filename):
             x2, y2 = map(float, lines[i].split())
             edge = tuple(sorted([(x1, y1), (x2, y2)]))
             edges.add(edge)
+    print("Finished reading edges and points")
     return X, Y, edges
 
 def plot_edges(X, Y, edges):
