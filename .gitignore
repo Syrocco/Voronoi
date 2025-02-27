@@ -1,0 +1,6 @@
+*
+!voronoi.c
+!Makefile
+!.gitignore
+!plot_edges.py
+!jc_voronoi.h
