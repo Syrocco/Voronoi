@@ -114,6 +114,8 @@ extern int jcv_boxshape_test(const jcv_clipper* clipper, const jcv_point p);
 extern int jcv_boxshape_clip(const jcv_clipper* clipper, jcv_edge* e);
 extern void jcv_boxshape_fillgaps(const jcv_clipper* clipper, jcv_context_internal* allocator, jcv_site* s);
 
+jcv_real jcv_abs(jcv_real v);
+jcv_real jcv_point_dist(const jcv_point* pt1, const jcv_point* pt2);
 
 #ifndef JCV_DISABLE_STRUCT_PACKING
 #pragma pack(push, 1)
@@ -216,7 +218,7 @@ static const jcv_real JCV_INVALID_VALUE = (jcv_real)-JCV_FLT_MAX;
 
 // jcv_real
 
-static inline jcv_real jcv_abs(jcv_real v) {
+inline jcv_real jcv_abs(jcv_real v) {
     return (v < 0) ? -v : v;
 }
 
@@ -336,7 +338,7 @@ static inline jcv_real jcv_point_dist_sq( const jcv_point* pt1, const jcv_point*
     return diffx * diffx + diffy * diffy;
 }
 
-static inline jcv_real jcv_point_dist( const jcv_point* pt1, const jcv_point* pt2 )
+jcv_real jcv_point_dist( const jcv_point* pt1, const jcv_point* pt2 )
 {
     return (jcv_real)(JCV_SQRT(jcv_point_dist_sq(pt1, pt2)));
 }

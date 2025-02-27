@@ -4,3 +4,5 @@
 !.gitignore
 !plot_edges.py
 !jc_voronoi.h
+!mersenne.c
+!helper.h

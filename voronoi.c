@@ -1,12 +1,3 @@
-// Contribution by: Abe Tusk https://github.com/abetusk
-// To compile:
-// gcc -Wall -Weverything -Wno-float-equal src/examples/simple.c -Isrc -o simple
-//
-// About:
-//
-// This example outputs 10 random 2D coordinates, and all the generated edges, to standard output.
-// Note that the edges have duplicates, but you can easily filter them out.
-//
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,31 +12,45 @@
 //#define JCV_FLOOR floor
 //#define JCV_FLT_MAX 1.7976931348623157E+308
 #include "jc_voronoi.h"
+#include "mersenne.c"
+#include "helper.h"
 
-#define NPOINT 3000
 
-int main(int argc, char** argv) {
-  (void)argc;
-  (void)argv;
+int N = 10000;
+jcv_real L = 10;
 
-  int i;
-  jcv_rect bounding_box = { { 0.0f, 0.0f }, { 1.0f, 1.0f } };
+int main() {
+   
+  //jcv_rect bounding_box = {{-L, L}, {2*L, 2*L}};
   jcv_diagram diagram;
-  jcv_point points[NPOINT];
+  jcv_point points[9*N];
   const jcv_site* sites;
   jcv_graphedge* graph_edge;
 
   memset(&diagram, 0, sizeof(jcv_diagram));
 
-  srand(0);
-  for (i=0; i<NPOINT; i++) {
-    points[i].x = ((float)rand()/(1.0f + (float)RAND_MAX));
-    points[i].y = ((float)rand()/(1.0f + (float)RAND_MAX));
-  }
-
+  init_genrand(0);
   
 
-  jcv_diagram_generate(NPOINT, (const jcv_point *)points, &bounding_box, 0, &diagram);
+  for (int i = 0; i < N; i++) {
+    points[i].x = drand(0, L);
+    points[i].y = drand(0, L);
+  }
+
+  int count = 0;
+  for (int i = 0; i < N; i++) {
+    for (int j = -1; j < 2; j++){
+      for (int k = -1; k < 2; k++){
+        if (j == 0 && k == 0) continue;
+        points[N + count].x = points[i].x + j*L;
+        points[N + count].y = points[i].y + k*L;
+        count++;
+      }
+    }
+  }
+  
+
+  jcv_diagram_generate(9*N, (const jcv_point *)points, NULL, 0, &diagram);
   sites = jcv_diagram_get_sites(&diagram);
 
   FILE *file = fopen("edges.txt", "w");
@@ -54,19 +59,23 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  fprintf(file, "%d\n", NPOINT);
+  fprintf(file, "%d\n", N);
 
-  for (i=0; i<NPOINT; i++) {
-    fprintf(file, "%f %f\n", points[i].x, points[i].y);
+  for (int i = 0; i < N; i++) {
+    fprintf(file, "%f %f\n", (float)points[i].x, (float)points[i].y);
   }
-  for (i=0; i<diagram.numsites; i++) {
-    graph_edge = sites[i].edges;
-    while (graph_edge) {
-      fprintf(file, "%f %f\n", graph_edge->pos[0].x, graph_edge->pos[0].y);
-      fprintf(file, "%f %f\n", graph_edge->pos[1].x, graph_edge->pos[1].y);
-      graph_edge = graph_edge->next;
+
+  for (int i = 0; i < 9*N; i++) {
+    if (sites[i].index < N){
+      graph_edge = sites[i].edges;
+      while (graph_edge) {
+        fprintf(file, "%f %f\n", (float)graph_edge->pos[0].x, (float)graph_edge->pos[0].y);
+        fprintf(file, "%f %f\n", (float)graph_edge->pos[1].x, (float)graph_edge->pos[1].y);
+        graph_edge = graph_edge->next;
+      }
     }
   }
+
 
   fclose(file);
 
