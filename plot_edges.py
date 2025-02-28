@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-
+from glob import glob
 def read_edges(filename):
     edges = set()
     X = []
@@ -33,5 +33,13 @@ def plot_edges(X, Y, edges):
     plt.show()
 
 if __name__ == "__main__":
-    X, Y, edges = read_edges('edges.txt')
-    plot_edges(X, Y, edges)
+    if 0:
+        X, Y, edges = read_edges('edges2.txt')
+        plot_edges(X, Y, edges)
+    else:
+        liste = glob("dump/*.txt")
+        for i in liste:
+            X, Y, edges = read_edges(i)
+            plot_edges(X, Y, edges)
+            plt.savefig(i.replace("dump", "images").replace(".txt", ".png"))
+            plt.close()

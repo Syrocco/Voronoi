@@ -2,6 +2,7 @@
 #define HELPER_H
 
 #include "jc_voronoi.h"
+#include <stdio.h>
 
 jcv_point jcv_add(const jcv_point a,const  jcv_point b);
 jcv_point jcv_sub(const jcv_point a, const jcv_point b);
@@ -18,4 +19,8 @@ jcv_real jcv_lenght_sq(const jcv_point* a);
 
 void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_real jacobian[2][2]);
 
+void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N);
+
+void populate_points(jcv_point* points, int N, jcv_real L);
+jcv_real pbc(jcv_real x, jcv_real L);
 #endif // HELPER_H

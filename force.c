@@ -28,34 +28,31 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
     jcv_site* sj = edgei->neighbor;
     jcv_graphedge* edgej = sj->edges;
 
-    
-
-    jcv_graphedge* runner = edgej;
-
     jcv_graphedge* prev_edge = NULL;
     jcv_graphedge* next_edge = NULL;
 
-    while (runner->next != NULL){
-        if (runner->next->neighbor == si) {
+    jcv_graphedge* runner = edgej;
+
+    while (runner != NULL) {
+        if (runner->neighbor == si) {
             runner = runner->next;
             break;
         }
-        prev_edge = runner->next;
+        prev_edge = runner;
         runner = runner->next;
     }
 
-    //If runner not at the end, h3-h8 is runner->next
-    if (runner->next != NULL){
-        next_edge = runner->next;
-    }
-    // If at the end, h3-h8 was the initial starting point
-    else{
+    // If next_edge is still NULL, it means the edge was not found
+    if (runner == NULL) {
         next_edge = edgej;
     }
+    else{
+        next_edge = runner;
+    }
 
-    //If prev_edge is NULL, h2-h7 is the last edge
-    if (prev_edge == NULL){
-        while (runner->next != NULL){
+    // If prev_edge is still NULL, it means the edge was the first one
+    if (prev_edge == NULL) {
+        while (runner->next != NULL) {
             runner = runner->next;
         }
         prev_edge = runner;
@@ -71,6 +68,8 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
     const jcv_point* rk = &(next_edge->neighbor->p);
     const jcv_point* rl = &(prev_edge->neighbor->p);
 
+    //printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f), rl = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y, rl->x, rl->y);
+
     const jcv_real Aj = jcv_area(sj);
     const jcv_real Pj = jcv_perimeter(sj);
 
@@ -80,12 +79,6 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
     //printf("Edges: h2: %f %f\n h3: %f %f\n h7: %f %f\n h8: %f %f\n\n", h2->x, h2->y, h3->x, h3->y, h7->x, h7->y, h8->x, h8->y);
 
 
-
-
-    jcv_real Fj = 0;
-    jcv_real h72 = jcv_point_dist(h2, h7);
-    jcv_real h23 = jcv_point_dist(h2, h3);
-    jcv_real h83 = jcv_point_dist(h3, h8);
     jcv_point dEj_dh2 = force_h(Aj, Pj, h7, h2, h3);
     jcv_point dEj_dh3 = force_h(Aj, Pj, h2, h3, h8);
 
@@ -100,14 +93,17 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
     jcv_real dEj_driy = (dEj_dh2.x*jacobian_h2[1][0] + dEj_dh2.y*jacobian_h2[1][1]
                         + dEj_dh3.x*jacobian_h3[1][0] + dEj_dh3.y*jacobian_h3[1][1]);
 
-    return (jcv_point){dEj_drix, dEj_driy};
+    //printf("No jac: %f %f %f %f ", dEj_dh2.x, dEj_dh2.y, dEj_dh3.x, dEj_dh3.y);
+    //printf("f. ij jac: %f %f ", jacobian_h2[1][1], jacobian_h3[1][1]);
+    return (jcv_point){-dEj_drix, -dEj_driy};
 
 }
 
 jcv_point get_edge_force_ii(const jcv_site* si){
     
     const jcv_point* ri = &(si->p);
-    jcv_point* rj,* rk;
+    jcv_point* rj = NULL;
+    jcv_point* rk = NULL;
 
     jcv_graphedge* edge = si->edges;
     jcv_graphedge* edge_after = edge->next;
@@ -135,9 +131,9 @@ jcv_point get_edge_force_ii(const jcv_site* si){
     derivative(ri, rk, &(si->edges->neighbor->p), jacobian);
     jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]));
     dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
-    dE_drx += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
+    dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
     //printf("%f %f \n", si->edges->pos[0].x, edge->pos[1].x);
-    return (jcv_point){dE_drx, dE_dry};
+    return (jcv_point){-dE_drx, -dE_dry};
 
 }

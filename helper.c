@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "jconfig.h"
 #include "helper.h"
-
+#include <stdio.h>
 /*
 Helper functions 
 */
@@ -75,7 +75,8 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jcv_real rij_sq = jcv_lenght_sq(&rij);
     jcv_real rik_sq = jcv_lenght_sq(&rik);
     jcv_real D = 2*rij_cross_rjk*rij_cross_rjk;
-
+    if (D == 0)
+       printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
 
     jcv_real alpha = rjk_sq*jcv_dot(rij, rik)/D;
     jcv_real beta = rik_sq*jcv_dot(rji, rjk)/D;
@@ -95,4 +96,47 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[0][1] = dalphadri.x*ri->y + dbetadri.x*rj->y + dgammadri.x*rk->y;
     jacobian[1][0] = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
     jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
+}
+
+
+void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N){
+    file = fopen(filename, "w");
+    if (file == NULL) {
+        perror("Failed to open file");
+        exit(1);
+    }
+    fprintf(file, "%d\n", N);
+    for (int i = 0; i < N; i++) {
+        fprintf(file, "%f %f\n", (float)points[i].x, (float)points[i].y);
+    }
+
+    const jcv_graphedge* graph_edge;
+    for (int i = 0; i < 9*N; i++){
+        if (sites[i].index >= N) continue;
+        graph_edge = sites[i].edges;
+        while (graph_edge) {
+            fprintf(file, "%f %f\n", (float)graph_edge->pos[0].x, (float)graph_edge->pos[0].y);
+            fprintf(file, "%f %f\n", (float)graph_edge->pos[1].x, (float)graph_edge->pos[1].y);
+            graph_edge = graph_edge->next;
+        }
+    }
+    fclose(file);
+}
+
+void populate_points(jcv_point* points, int N, jcv_real L){
+    int count = 0;
+	for (int i = 0; i < N; i++) {
+		for (int j = -1; j < 2; j++){
+			for (int k = -1; k < 2; k++){
+				if (j == 0 && k == 0) continue;
+				points[N + count].x = points[i].x + j*L;
+				points[N + count].y = points[i].y + k*L;
+				count++;
+			}
+		}
+	}
+}
+
+jcv_real pbc(jcv_real x, jcv_real L){
+    return fmod(x + L, L);
 }
