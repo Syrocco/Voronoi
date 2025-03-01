@@ -14,11 +14,11 @@
 //#define JCV_FLT_MAX 1.7976931348623157E+308
 #include "jc_voronoi.h"
 #include "mersenne.c"
-
+#include "jc_voronoi_clip.h"
 #include "helper.h"
 #include "force.h"
 
-int N = 30;
+int N = 3001;
 int M = 1000;
 
 jcv_real L;
@@ -26,8 +26,10 @@ jcv_real dt = 0.01;
 FILE *file;
 
 int main(){
-	 L = JCV_SQRT((JCV_REAL_TYPE)N);
-	//jcv_rect bounding_box = {{-L, L}, {2*L, 2*L}};
+	L = JCV_SQRT((JCV_REAL_TYPE)N);
+
+	jcv_rect bounding_box = {{-L, -L}, {2*L, 2*L}};
+
 	jcv_diagram diagram;
 	jcv_point points[9*N];
 	const jcv_site* sites;
@@ -47,16 +49,17 @@ int main(){
 	populate_points(points, N, L);
 	
 
-	jcv_diagram_generate(9*N, points, NULL, 0, &diagram);
+	
+	jcv_diagram_generate(9*N, points, &bounding_box, NULL, &diagram);
 	sites = jcv_diagram_get_sites(&diagram);
-
+	
 
 
 	char filename[256];
 	jcv_point force[N];
-
+	system("mkdir -p dump");
 	for (int m = 0; m < M; m++){
-		if (m%30 == 0){
+		if (m%10 == 0){
 			sprintf(filename, "dump/%d.txt", m);
 			write(file, filename, points, sites, N);
 		}
@@ -82,9 +85,12 @@ int main(){
 			f.y += force[i].y;
 		}
 		printf("m = %d, f = (%f, %f), E = %f \n", m, f.x, f.y, energy(sites, N));
+	
+
 		populate_points(points, N, L);
 
 		jcv_diagram_generate(9*N, points, NULL, 0, &diagram);
 		sites = jcv_diagram_get_sites(&diagram);
 	}
+	
 }

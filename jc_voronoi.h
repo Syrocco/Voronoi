@@ -1314,7 +1314,8 @@ void jcv_boxshape_fillgaps(const jcv_clipper* clipper, jcv_context_internal* all
 
 
 // Since the algorithm leaves gaps at the borders/corner, we want to fill them
-static void jcv_fillgaps(jcv_diagram* diagram)
+
+/*static void jcv_fillgaps(jcv_diagram* diagram)
 {
     jcv_context_internal* internal = diagram->internal;
     if (!internal->clipper.fill_fn)
@@ -1326,7 +1327,7 @@ static void jcv_fillgaps(jcv_diagram* diagram)
         internal->clipper.fill_fn(&internal->clipper, internal, site);
     }
 }
-
+*/
 
 static void jcv_circle_event(jcv_context_internal* internal)
 {
@@ -1631,7 +1632,9 @@ void jcv_diagram_generate_useralloc(int num_points, const jcv_point* points, con
         jcv_finishline(internal, he->edge);
     }
 
-    jcv_fillgaps(d);
+    // Introduced some bugs, So disabled for now
+
+    //jcv_fillgaps(d);
 }
 
 #endif // JC_VORONOI_IMPLEMENTATION
