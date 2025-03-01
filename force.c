@@ -121,7 +121,7 @@ jcv_point get_edge_force_ii(const jcv_site* si){
         derivative(ri, rj, rk, jacobian);
         jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]));
         dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
-        dE_drx += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
+        dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
         edge = edge_after;
         edge_after = edge_after->next;
