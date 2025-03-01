@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 jcv_real Ao = 1.0;
-jcv_real Po = 1.0;
+jcv_real Po = 3.5;
 jcv_real Ka = 1.0;
 jcv_real Kp = 1.0;
 
@@ -136,4 +136,14 @@ jcv_point get_edge_force_ii(const jcv_site* si){
     //printf("%f %f \n", si->edges->pos[0].x, edge->pos[1].x);
     return (jcv_point){-dE_drx, -dE_dry};
 
+}
+
+jcv_real energy(const jcv_site* sites, const int N){
+    jcv_real E = 0;
+    for (int i = 0; i < 9*N; i++){
+        if (sites[i].index >= N) continue;
+        E += Ka*(jcv_area(sites + i) - Ao)*(jcv_area(sites + i) - Ao);
+        E += Kp*(jcv_perimeter(sites + i) - Po)*(jcv_perimeter(sites + i) - Po);
+    }
+    return E;
 }

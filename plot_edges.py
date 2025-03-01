@@ -33,8 +33,8 @@ def plot_edges(X, Y, edges):
     plt.show()
 
 if __name__ == "__main__":
-    if 0:
-        X, Y, edges = read_edges('edges2.txt')
+    if 1:
+        X, Y, edges = read_edges('dump/990.txt')
         plot_edges(X, Y, edges)
     else:
         liste = glob("dump/*.txt")

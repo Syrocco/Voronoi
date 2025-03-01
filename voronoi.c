@@ -18,15 +18,15 @@
 #include "helper.h"
 #include "force.h"
 
-int N = 300;
-int M = 100;
+int N = 30;
+int M = 1000;
 
-jcv_real L = 15;
+jcv_real L;
 jcv_real dt = 0.01;
 FILE *file;
 
 int main(){
-	 
+	 L = JCV_SQRT((JCV_REAL_TYPE)N);
 	//jcv_rect bounding_box = {{-L, L}, {2*L, 2*L}};
 	jcv_diagram diagram;
 	jcv_point points[9*N];
@@ -56,7 +56,7 @@ int main(){
 	jcv_point force[N];
 
 	for (int m = 0; m < M; m++){
-		if (m%3 == 0){
+		if (m%30 == 0){
 			sprintf(filename, "dump/%d.txt", m);
 			write(file, filename, points, sites, N);
 		}
@@ -73,10 +73,15 @@ int main(){
 			}
 		}
 
+
+		jcv_point f = {0, 0};
 		for (int i = 0; i < N; i++){
 			points[i].x = pbc(points[i].x + dt*force[i].x, L);
 			points[i].y = pbc(points[i].y + dt*force[i].y, L);
+			f.x += force[i].x;
+			f.y += force[i].y;
 		}
+		printf("m = %d, f = (%f, %f), E = %f \n", m, f.x, f.y, energy(sites, N));
 		populate_points(points, N, L);
 
 		jcv_diagram_generate(9*N, points, NULL, 0, &diagram);
