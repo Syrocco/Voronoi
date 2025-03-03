@@ -28,7 +28,7 @@
     } while (0)
 
 int main(int argc, char *argv[]){
-    init_genrand(5);
+    init_genrand(0);
 
     data sys;
     sys.parameter.Ao = 1.0;
@@ -36,16 +36,16 @@ int main(int argc, char *argv[]){
     sys.parameter.Ka = 1.0;
     sys.parameter.Kp = 1.0;
     sys.N = 100;
-    sys.M = 400; 
+    sys.M = 200; 
     sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
     sys.dt = 0.1;
-    printf("L = %f, dL = %f\n", sys.L, sys.dL);
+    
     
     constantInit(argc, argv, &sys);
     
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
-    jcv_point positions[9*sys.N];
+    jcv_point positions[8*sys.N];
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
     sys.diagram = &diagram;
@@ -66,19 +66,19 @@ int main(int argc, char *argv[]){
         sys.sites = jcv_diagram_get_sites(sys.diagram);
         printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, sys.N_pbc, &sys.parameter));
 
-        if (m%1 == 0){
+        if (m%1000 == 0){
             saveTXT(sys.file, sys.positions, sys.N_pbc, m, sys.L);
 
-            /*
+            
 			char filename[100];
             sprintf(filename, "dump/a.txt");
 			FILE* file = fopen(filename, "w");
             write(file, filename, sys.positions, sys.sites, sys.N, sys.N_pbc);
 			fclose(file);
-            */
+            
         }
 
-        TIME_FUNCTION(compute_force, &sys);
+        TIME_FUNCTION(compute_force,&sys);
         
 
         sys.N_pbc = sys.N;

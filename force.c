@@ -4,10 +4,12 @@
 #include <stdio.h>
 #include "voronoi.h"
 
-
 jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
     jcv_real h72 = jcv_point_dist(h2, h7);
     jcv_real h23 = jcv_point_dist(h2, h3);
+    if (jcv_real_eq(h72, 0) || jcv_real_eq(h23, 0)) { //Hacky, can be exactly 0 due to floating point stupidity
+        return (jcv_point){0, 0};
+    }
     jcv_point opp = {h3->y - h7->y, h3->x - h7->x};
     jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
 
@@ -109,13 +111,15 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     jcv_real dE_dry = 0;
     jcv_real jacobian[2][2] = {{0, 0}, {0, 0}};
 
+    jcv_real area = jcv_area(si);
+    jcv_real perimeter = jcv_perimeter(si);
     while (edge_after != NULL){
 
         rj = &(edge->neighbor->p);
         rk = &(edge_after->neighbor->p);
 
         derivative(ri, rj, rk, jacobian);
-        jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
+        jcv_point dE_dh = force_h(area, perimeter, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
         dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
         dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
@@ -135,8 +139,8 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
 }
 
 void compute_force(data* sys){
+
     for (int i = 0; i < sys->N_pbc; i++){
-			
         if (sys->sites[i].index >= sys->N) continue;
         sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter);
         jcv_graphedge* graph_edge = sys->sites[i].edges;

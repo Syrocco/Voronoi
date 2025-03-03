@@ -116,6 +116,7 @@ extern void jcv_boxshape_fillgaps(const jcv_clipper* clipper, jcv_context_intern
 
 jcv_real jcv_abs(jcv_real v);
 jcv_real jcv_point_dist(const jcv_point* pt1, const jcv_point* pt2);
+int jcv_real_eq(jcv_real a, jcv_real b);
 
 #ifndef JCV_DISABLE_STRUCT_PACKING
 #pragma pack(push, 1)
@@ -222,7 +223,7 @@ inline jcv_real jcv_abs(jcv_real v) {
     return (v < 0) ? -v : v;
 }
 
-static inline int jcv_real_eq(jcv_real a, jcv_real b)
+inline int jcv_real_eq(jcv_real a, jcv_real b)
 {
     return jcv_abs(a - b) < JCV_REAL_TYPE_EPSILON;
 }

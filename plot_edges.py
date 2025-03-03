@@ -1,5 +1,9 @@
 import matplotlib.pyplot as plt
 from glob import glob
+import os
+import numpy as np
+from matplotlib.collections import LineCollection
+
 def read_edges(filename):
     edges = set()
     X = []
@@ -21,21 +25,21 @@ def read_edges(filename):
     return X, Y, edges
 
 def plot_edges(X, Y, edges):
-    plt.figure()
-    for edge in edges:
-        x_values = [edge[0][0], edge[1][0]]
-        y_values = [edge[0][1], edge[1][1]]
-        plt.plot(x_values, y_values, 'b-')
-    plt.scatter(X, Y, color = "black")
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title('Voronoi Diagram Edges')
+    lines = [ [edge[0], edge[1]] for edge in edges ]
+    lc = LineCollection(lines, colors='b', linewidths=1)
+
+    # Create figure and axis
+    fig, ax = plt.subplots()
+    ax.add_collection(lc)
+    plt.scatter(X, Y, c = np.linspace(0, len(X), len(X)))
+    plt.axis("off")
     plt.show()
 
 if __name__ == "__main__":
     if 1:
         X, Y, edges = read_edges('dump/a.txt')
         plot_edges(X, Y, edges)
+        
     else:
         liste = glob("dump/*.txt")
         for i in liste:

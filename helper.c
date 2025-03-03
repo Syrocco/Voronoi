@@ -6,6 +6,7 @@
 /*
 Helper functions 
 */
+#define epsilon 0.0
 
 inline jcv_point jcv_add(const jcv_point a, const jcv_point b){
     jcv_point c = {a.x + b.x, a.y + b.y};
@@ -114,6 +115,7 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
         perror("Failed to open file");
         exit(1);
     }
+
     fprintf(file, "%d\n", N);
     for (int i = 0; i < N; i++) {
         fprintf(file, "%f %f\n", (float)points[i].x, (float)points[i].y);
@@ -121,7 +123,6 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
 
     const jcv_graphedge* graph_edge;
     for (int i = 0; i < N_pbc; i++){
-       
         if (sites[i].index >= N) continue;
 
         graph_edge = sites[i].edges;
@@ -160,17 +161,17 @@ void addBoundary(data* sys, int i){
 
     if (left || right) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + drand(-epsilon, epsilon); //Evil af trick, Fortune's sweep does not like same x or y..
         sys->N_pbc++;
     }
     if (bottom || top) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x;
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + drand(-epsilon, epsilon);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L);
         sys->N_pbc++;
     }
     if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L);
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L) + drand(-epsilon, epsilon);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L) + drand(-epsilon, epsilon);
         sys->N_pbc++;
     }
 

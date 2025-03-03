@@ -10,7 +10,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/voronoi",
-            "args": ["-N", "10000", "-d", "0.2"],
+            "args": ["-N", "100", "-m", "10000", "-p", "4.2"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

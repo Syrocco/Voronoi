@@ -27,4 +27,5 @@ void populate_points(jcv_point* points, int N, jcv_real L);
 jcv_real pbc(jcv_real x, jcv_real L);
 void addBoundary(data* sys, int i);
 
+double drand(double min, double max);
 #endif // HELPER_H
