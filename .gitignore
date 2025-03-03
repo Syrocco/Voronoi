@@ -7,6 +7,8 @@
 !mersenne.c
 !helper.h
 !.vscode/*
+!.vscode
 !force.c
 !force.h
 !helper.c
+!voronoi.h

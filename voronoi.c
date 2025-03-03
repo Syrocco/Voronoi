@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,85 +16,95 @@
 #include "helper.h"
 #include "force.h"
 #include "voronoi.h"
-#include<getopt.h>
+#include <getopt.h>
 
-
-FILE *file;
 
 int main(int argc, char *argv[]){
-	init_genrand(0);
+    init_genrand(0);
 
-	data sys;
-	sys.parameter.Ao = 1.0;
-	sys.parameter.Po = 3.7;
-	sys.parameter.Ka = 1.0;
-	sys.parameter.Kp = 1.0;
-	sys.N = 100;
-	sys.M = 10000; 
-	sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
-	sys.dt = 0.1;
-	
-	constantInit(argc, argv, &sys);
-	
-	jcv_diagram diagram;
-	memset(&(diagram), 0, sizeof(jcv_diagram));
-	jcv_point positions[9*sys.N];
-	jcv_point velocities[sys.N];
-	jcv_point forces[sys.N];
-	sys.diagram = &diagram;
-	sys.positions = positions;
-	sys.velocities = velocities;
-	sys.forces = forces;
-	
+    data sys;
+    sys.parameter.Ao = 1.0;
+    sys.parameter.Po = 3.7;
+    sys.parameter.Ka = 1.0;
+    sys.parameter.Kp = 1.0;
+    sys.N = 100;
+    sys.M = 10000; 
+    sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
+    sys.dt = 0.1;
+    
+    constantInit(argc, argv, &sys);
+    
+    jcv_diagram diagram;
+    memset(&(diagram), 0, sizeof(jcv_diagram));
+    jcv_point positions[9*sys.N];
+    jcv_point velocities[sys.N];
+    jcv_point forces[sys.N];
+    sys.diagram = &diagram;
+    sys.positions = positions;
+    sys.velocities = velocities;
+    sys.forces = forces;
+    
 
-	
-	for (int i = 0; i < sys.N; i++) {
-		sys.positions[i].x = drand(0, sys.L);
-		sys.positions[i].y = drand(0, sys.L);
-	}
+    
+    for (int i = 0; i < sys.N; i++) {
+        sys.positions[i].x = drand(0, sys.L);
+        sys.positions[i].y = drand(0, sys.L);
+    }
 
-	
-	
-	int info = system("mkdir -p dump");
-	file = fopen("dump/a.dump", "w");
-	for (int m = 0; m < sys.M; m++){
-		populate_points(sys.positions, sys.N, sys.L);
-		jcv_diagram_generate(9*sys.N, sys.positions, NULL, 0, sys.diagram);
-		sys.sites = jcv_diagram_get_sites(sys.diagram);
+    
+    
+    
+    for (int m = 0; m < sys.M; m++){
+        //clock_t start_time = clock();
+        
+        populate_points(sys.positions, sys.N, sys.L);
+        jcv_diagram_generate(9*sys.N, sys.positions, NULL, 0, sys.diagram);
+        sys.sites = jcv_diagram_get_sites(sys.diagram);
+        
+        //clock_t end_time = clock();
+        //double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+        //printf("Time for populate_points, jcv_diagram_generate, and jcv_diagram_get_sites: %f seconds\n", elapsed_time);
 
-		if (m%25 == 0){
-			saveTXT(file, sys.positions, sys.N, m, sys.L);
-			//sprintf(filename, "dump/%d.txt", m);
-			//write(file, filename, points, sites, N);
-		}
-		compute_force(&sys);
+        if (m%25 == 0){
+            saveTXT(sys.file, sys.positions, sys.N, m, sys.L);
+            //sprintf(filename, "dump/%d.txt", m);
+            //write(file, filename, points, sites, N);
+        }
 
+        //start_time = clock();
+        compute_force(&sys);
+        //end_time = clock();
+        //elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+        //printf("Time for compute_force: %f seconds\n", elapsed_time);
 
-		for (int i = 0; i < sys.N; i++){
-			sys.positions[i].x = pbc(sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
-			sys.positions[i].y = pbc(sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
-		}
-		printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, &sys.parameter));
-		
-	}
-	return 1;
+        for (int i = 0; i < sys.N; i++){
+            sys.positions[i].x = pbc(sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
+            sys.positions[i].y = pbc(sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
+        }
+        printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, &sys.parameter));
+        
+    }
+
+	fclose(sys.file);
+	jcv_diagram_free(sys.diagram);
+	return 0;
 }
 
 
 void constantInit(int argc, char *argv[], data* sys){
 
 
-	struct option longopt[] = {
-		{"number", required_argument, NULL, 'N'},
-		{"Po", required_argument, NULL, 'p'},
+    struct option longopt[] = {
+        {"number", required_argument, NULL, 'N'},
+        {"Po", required_argument, NULL, 'p'},
         {"Ao", required_argument, NULL, 'a'},
         {"Ka", required_argument, NULL, 'k'},
         {"Kp", required_argument, NULL, 'P'},
-		{"dt", required_argument, NULL, 'D'},
-		{"M", required_argument, NULL, 'm'},
-		{NULL, 0, NULL, 0}
-	};
-	
+        {"dt", required_argument, NULL, 'D'},
+        {"time", required_argument, NULL, 'M'},
+        {NULL, 0, NULL, 0}
+    };
+    
 
     int c;
 
@@ -125,5 +134,14 @@ void constantInit(int argc, char *argv[], data* sys){
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
+	int info = system("mkdir -p dump");
+	if (info != 0) {
+        fprintf(stderr, "Error: Failed to create directory 'dump'\n");
+        return;
+    }
+
+	char filename[100];
+	sprintf(filename, "dump/N_%dPo_%f.dump", sys->N, sys->parameter.Po);
+	sys->file = fopen(filename, "w");
 }
 
