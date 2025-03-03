@@ -2,6 +2,7 @@
 #include "jconfig.h"
 #include "helper.h"
 #include <stdio.h>
+
 /*
 Helper functions 
 */
@@ -98,6 +99,14 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
 }
 
+void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L){
+
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS pp pp pp\n0 %f\n0 %f\n0 %f\nITEM: ATOMS id x y z\n", m, N, L, L, 1.);
+    for(int i = 0; i < N; i++){
+        fprintf(file, "%d %lf %lf %lf\n", i, points[i].x, points[i].y, 0.2);
+    }
+    fflush(file);
+}
 
 void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N){
     file = fopen(filename, "w");

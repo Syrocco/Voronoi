@@ -14,11 +14,10 @@
 //#define JCV_FLT_MAX 1.7976931348623157E+308
 #include "jc_voronoi.h"
 #include "mersenne.c"
-#include "jc_voronoi_clip.h"
 #include "helper.h"
 #include "force.h"
 
-int N = 3001;
+int N = 300;
 int M = 1000;
 
 jcv_real L;
@@ -55,13 +54,16 @@ int main(){
 	
 
 
-	char filename[256];
+	//char filename[256];
 	jcv_point force[N];
+	
 	system("mkdir -p dump");
+	file = fopen("dump/a.dump", "w");
 	for (int m = 0; m < M; m++){
 		if (m%10 == 0){
-			sprintf(filename, "dump/%d.txt", m);
-			write(file, filename, points, sites, N);
+			saveTXT(file, points, N, m, L);
+			//sprintf(filename, "dump/%d.txt", m);
+			//write(file, filename, points, sites, N);
 		}
 		for (int i = 0; i < 9*N; i++){
 			
@@ -94,3 +96,5 @@ int main(){
 	}
 	
 }
+
+
