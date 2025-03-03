@@ -45,13 +45,6 @@ This will execute the Voronoi diagram generation and related computations as def
 ## Dependencies
 
 Ensure you have the following dependencies installed:
-- GCC (GNU Compiler Collection)
+- GCC
 - Make
 
-## License
-
-This project is licensed under the MIT License.
-```
-
-This README provides a brief description of the project, instructions on how to compile it using the Makefile, and usage information.
-This README provides a brief description of the project, instructions on how to compile it using the Makefile, and usage information.
