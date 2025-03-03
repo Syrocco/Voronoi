@@ -24,11 +24,12 @@ struct data_
     jcv_point* forces;
     const jcv_site* sites;
 
-    jcv_real L;
+    jcv_real L, dL;
     jcv_real dt;
     parameter parameter;
     int N;
     int M;
+    int N_pbc;
 
     FILE* file;
 };

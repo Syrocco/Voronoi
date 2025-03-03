@@ -135,7 +135,7 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
 }
 
 void compute_force(data* sys){
-    for (int i = 0; i < 9*sys->N; i++){
+    for (int i = 0; i < sys->N_pbc; i++){
 			
         if (sys->sites[i].index >= sys->N) continue;
         sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter);
@@ -149,9 +149,9 @@ void compute_force(data* sys){
     }
 }
 
-jcv_real energy(const jcv_site* sites, const int N, const parameter* param){
+jcv_real energy(const jcv_site* sites, const int N, const int N_pbc, const parameter* param){
     jcv_real E = 0;
-    for (int i = 0; i < 9*N; i++){
+    for (int i = 0; i < N_pbc; i++){
         if (sites[i].index >= N) continue;
         E += param->Ka*(jcv_area(sites + i) - param->Ao)*(jcv_area(sites + i) - param->Ao);
         E += param->Kp*(jcv_perimeter(sites + i) - param->Po)*(jcv_perimeter(sites + i) - param->Po);

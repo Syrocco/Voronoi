@@ -1314,8 +1314,8 @@ void jcv_boxshape_fillgaps(const jcv_clipper* clipper, jcv_context_internal* all
 
 
 // Since the algorithm leaves gaps at the borders/corner, we want to fill them
-
-/*static void jcv_fillgaps(jcv_diagram* diagram)
+/*
+static void jcv_fillgaps(jcv_diagram* diagram)
 {
     jcv_context_internal* internal = diagram->internal;
     if (!internal->clipper.fill_fn)

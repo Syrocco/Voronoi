@@ -1,5 +1,5 @@
 CXX = gcc
-CXXFLAGS = -O3 -Wall -Wno-float-equal -Wextra -std=c11 
+CXXFLAGS = -g -Wall -Wno-float-equal -Wextra -std=c11 #-fsanitize=address -fsanitize=undefined -fsanitize=leak 
 LDFLAGS = -lm
 
 TARGET = voronoi

@@ -11,6 +11,6 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param);
 
 void compute_force(data* sys);
 
-jcv_real energy(const jcv_site* sites, const int N, const parameter* param);
+jcv_real energy(const jcv_site* sites, const int N, const int N_pbc, const parameter* param);
 
 #endif

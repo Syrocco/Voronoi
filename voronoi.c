@@ -18,9 +18,17 @@
 #include "voronoi.h"
 #include <getopt.h>
 
+#define TIME_FUNCTION(func, ...) \
+    do { \
+        clock_t start_time = clock(); \
+        func(__VA_ARGS__); \
+        clock_t end_time = clock(); \
+        double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC; \
+        printf("Time for %s: %f seconds\n", #func, elapsed_time); \
+    } while (0)
 
 int main(int argc, char *argv[]){
-    init_genrand(0);
+    init_genrand(5);
 
     data sys;
     sys.parameter.Ao = 1.0;
@@ -28,9 +36,10 @@ int main(int argc, char *argv[]){
     sys.parameter.Ka = 1.0;
     sys.parameter.Kp = 1.0;
     sys.N = 100;
-    sys.M = 10000; 
+    sys.M = 400; 
     sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
     sys.dt = 0.1;
+    printf("L = %f, dL = %f\n", sys.L, sys.dL);
     
     constantInit(argc, argv, &sys);
     
@@ -44,44 +53,42 @@ int main(int argc, char *argv[]){
     sys.velocities = velocities;
     sys.forces = forces;
     
-
-    
+    sys.N_pbc = sys.N;
     for (int i = 0; i < sys.N; i++) {
         sys.positions[i].x = drand(0, sys.L);
         sys.positions[i].y = drand(0, sys.L);
+        addBoundary(&sys, i);
     }
-
-    
-    
     
     for (int m = 0; m < sys.M; m++){
-        //clock_t start_time = clock();
         
-        populate_points(sys.positions, sys.N, sys.L);
-        jcv_diagram_generate(9*sys.N, sys.positions, NULL, 0, sys.diagram);
+        TIME_FUNCTION(jcv_diagram_generate, sys.N_pbc, sys.positions, NULL, 0, sys.diagram);
         sys.sites = jcv_diagram_get_sites(sys.diagram);
-        
-        //clock_t end_time = clock();
-        //double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-        //printf("Time for populate_points, jcv_diagram_generate, and jcv_diagram_get_sites: %f seconds\n", elapsed_time);
+        printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, sys.N_pbc, &sys.parameter));
 
-        if (m%25 == 0){
-            saveTXT(sys.file, sys.positions, sys.N, m, sys.L);
-            //sprintf(filename, "dump/%d.txt", m);
-            //write(file, filename, points, sites, N);
+        if (m%1 == 0){
+            saveTXT(sys.file, sys.positions, sys.N_pbc, m, sys.L);
+
+            /*
+			char filename[100];
+            sprintf(filename, "dump/a.txt");
+			FILE* file = fopen(filename, "w");
+            write(file, filename, sys.positions, sys.sites, sys.N, sys.N_pbc);
+			fclose(file);
+            */
         }
 
-        //start_time = clock();
-        compute_force(&sys);
-        //end_time = clock();
-        //elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-        //printf("Time for compute_force: %f seconds\n", elapsed_time);
+        TIME_FUNCTION(compute_force, &sys);
+        
 
+        sys.N_pbc = sys.N;
         for (int i = 0; i < sys.N; i++){
+            
             sys.positions[i].x = pbc(sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
             sys.positions[i].y = pbc(sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
+            addBoundary(&sys, i);
         }
-        printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, &sys.parameter));
+        
         
     }
 
@@ -102,13 +109,14 @@ void constantInit(int argc, char *argv[], data* sys){
         {"Kp", required_argument, NULL, 'P'},
         {"dt", required_argument, NULL, 'D'},
         {"time", required_argument, NULL, 'M'},
+        {"dL", required_argument, NULL, 'd'},
         {NULL, 0, NULL, 0}
     };
     
 
     int c;
-
-    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:", longopt, NULL)) != -1){
+    int control_dL = 0;
+    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:", longopt, NULL)) != -1){
         switch(c){
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
@@ -131,6 +139,10 @@ void constantInit(int argc, char *argv[], data* sys){
             case 'm':
                 sscanf(optarg, "%d", &sys->M);
                 break;
+            case 'd':
+                sscanf(optarg, "%f", &sys->dL);
+                control_dL = 1;
+                break;
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
@@ -139,7 +151,9 @@ void constantInit(int argc, char *argv[], data* sys){
         fprintf(stderr, "Error: Failed to create directory 'dump'\n");
         return;
     }
-
+    if (control_dL == 0){
+        sys->dL = fminf(3/sys->L, 1.0);
+    }
 	char filename[100];
 	sprintf(filename, "dump/N_%dPo_%f.dump", sys->N, sys->parameter.Po);
 	sys->file = fopen(filename, "w");

@@ -2,7 +2,7 @@
 #include "jconfig.h"
 #include "helper.h"
 #include <stdio.h>
-
+#include "voronoi.h"
 /*
 Helper functions 
 */
@@ -108,7 +108,7 @@ void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L){
     fflush(file);
 }
 
-void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N){
+void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N, int N_pbc){
     file = fopen(filename, "w");
     if (file == NULL) {
         perror("Failed to open file");
@@ -120,8 +120,10 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
     }
 
     const jcv_graphedge* graph_edge;
-    for (int i = 0; i < 9*N; i++){
+    for (int i = 0; i < N_pbc; i++){
+       
         if (sites[i].index >= N) continue;
+
         graph_edge = sites[i].edges;
         while (graph_edge) {
             fprintf(file, "%f %f\n", (float)graph_edge->pos[0].x, (float)graph_edge->pos[0].y);
@@ -148,4 +150,28 @@ void populate_points(jcv_point* points, int N, jcv_real L){
 
 jcv_real pbc(jcv_real x, jcv_real L){
     return fmod(x + L, L);
+}
+
+void addBoundary(data* sys, int i){
+    int left = sys->positions[i].x / sys->L < sys->dL;
+    int right = sys->positions[i].x / sys->L > 1 - sys->dL;
+    int bottom = sys->positions[i].y / sys->L < sys->dL;
+    int top = sys->positions[i].y / sys->L > 1 - sys->dL;
+
+    if (left || right) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y;
+        sys->N_pbc++;
+    }
+    if (bottom || top) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L);
+        sys->N_pbc++;
+    }
+    if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L);
+        sys->N_pbc++;
+    }
+
 }
