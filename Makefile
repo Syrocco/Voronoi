@@ -1,5 +1,5 @@
 CXX = gcc
-CXXFLAGS = -g -Wall -Wno-float-equal -Wextra -std=c11 
+CXXFLAGS = -O3 -Wall -Wno-float-equal -Wextra -std=c11 
 LDFLAGS = -lm
 
 TARGET = voronoi

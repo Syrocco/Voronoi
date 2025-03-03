@@ -2,26 +2,22 @@
 #include "helper.h"
 #include "jc_voronoi.h"
 #include <stdio.h>
-
-jcv_real Ao = 1.0;
-jcv_real Po = 3.5;
-jcv_real Ka = 1.0;
-jcv_real Kp = 1.0;
+#include "voronoi.h"
 
 
-jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3){
+jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
     jcv_real h72 = jcv_point_dist(h2, h7);
     jcv_real h23 = jcv_point_dist(h2, h3);
     jcv_point opp = {h3->y - h7->y, h3->x - h7->x};
-    jcv_point area = jcv_mul(Ka*(A - Ao), opp);
+    jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
 
     jcv_point perimeter_last = jcv_add(jcv_mul(1/h72, jcv_sub(*h2, *h7)), jcv_mul(1/h23, jcv_sub(*h2, *h3)));
 
-    jcv_point perimeter = jcv_mul(2*Kp*(P - Po), perimeter_last);
+    jcv_point perimeter = jcv_mul(2*param->Kp*(P - param->Po), perimeter_last);
     return jcv_add(area, perimeter);
 }
 
-jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
+jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, const parameter* param){
 
     //edgei is owned by site i: si
 
@@ -79,8 +75,8 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
     //printf("Edges: h2: %f %f\n h3: %f %f\n h7: %f %f\n h8: %f %f\n\n", h2->x, h2->y, h3->x, h3->y, h7->x, h7->y, h8->x, h8->y);
 
 
-    jcv_point dEj_dh2 = force_h(Aj, Pj, h7, h2, h3);
-    jcv_point dEj_dh3 = force_h(Aj, Pj, h2, h3, h8);
+    jcv_point dEj_dh2 = force_h(Aj, Pj, h7, h2, h3, param);
+    jcv_point dEj_dh3 = force_h(Aj, Pj, h2, h3, h8, param);
 
     jcv_real jacobian_h2[2][2] = {{0, 0}, {0, 0}};
     jcv_real jacobian_h3[2][2] = {{0, 0}, {0, 0}};
@@ -99,7 +95,7 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei){
 
 }
 
-jcv_point get_edge_force_ii(const jcv_site* si){
+jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     
     const jcv_point* ri = &(si->p);
     jcv_point* rj = NULL;
@@ -119,7 +115,7 @@ jcv_point get_edge_force_ii(const jcv_site* si){
         rk = &(edge_after->neighbor->p);
 
         derivative(ri, rj, rk, jacobian);
-        jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]));
+        jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
         dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
         dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
@@ -129,7 +125,7 @@ jcv_point get_edge_force_ii(const jcv_site* si){
 
     //Last triangle in Delaunay made of last edge and first edge
     derivative(ri, rk, &(si->edges->neighbor->p), jacobian);
-    jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]));
+    jcv_point dE_dh = force_h(jcv_area(si), jcv_perimeter(si), &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
     dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
     dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
@@ -138,12 +134,28 @@ jcv_point get_edge_force_ii(const jcv_site* si){
 
 }
 
-jcv_real energy(const jcv_site* sites, const int N){
+void compute_force(data* sys){
+    for (int i = 0; i < 9*sys->N; i++){
+			
+        if (sys->sites[i].index >= sys->N) continue;
+        sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter);
+        jcv_graphedge* graph_edge = sys->sites[i].edges;
+        while (graph_edge){
+            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, &sys->parameter);
+            sys->forces[sys->sites[i].index].x += force_ji.x;
+            sys->forces[sys->sites[i].index].y += force_ji.y;
+            graph_edge = graph_edge->next;
+        }
+    }
+}
+
+jcv_real energy(const jcv_site* sites, const int N, const parameter* param){
     jcv_real E = 0;
     for (int i = 0; i < 9*N; i++){
         if (sites[i].index >= N) continue;
-        E += Ka*(jcv_area(sites + i) - Ao)*(jcv_area(sites + i) - Ao);
-        E += Kp*(jcv_perimeter(sites + i) - Po)*(jcv_perimeter(sites + i) - Po);
+        E += param->Ka*(jcv_area(sites + i) - param->Ao)*(jcv_area(sites + i) - param->Ao);
+        E += param->Kp*(jcv_perimeter(sites + i) - param->Po)*(jcv_perimeter(sites + i) - param->Po);
     }
     return E;
 }
+

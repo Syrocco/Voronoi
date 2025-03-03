@@ -16,85 +16,114 @@
 #include "mersenne.c"
 #include "helper.h"
 #include "force.h"
+#include "voronoi.h"
+#include<getopt.h>
 
-int N = 300;
-int M = 1000;
 
-jcv_real L;
-jcv_real dt = 0.01;
 FILE *file;
 
-int main(){
-	L = JCV_SQRT((JCV_REAL_TYPE)N);
-
-	jcv_rect bounding_box = {{-L, -L}, {2*L, 2*L}};
-
-	jcv_diagram diagram;
-	jcv_point points[9*N];
-	const jcv_site* sites;
-	jcv_graphedge* graph_edge;
-
-	memset(&diagram, 0, sizeof(jcv_diagram));
-
+int main(int argc, char *argv[]){
 	init_genrand(0);
+
+	data sys;
+	sys.parameter.Ao = 1.0;
+	sys.parameter.Po = 3.7;
+	sys.parameter.Ka = 1.0;
+	sys.parameter.Kp = 1.0;
+	sys.N = 100;
+	sys.M = 10000; 
+	sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
+	sys.dt = 0.1;
+	
+	constantInit(argc, argv, &sys);
+	
+	jcv_diagram diagram;
+	memset(&(diagram), 0, sizeof(jcv_diagram));
+	jcv_point positions[9*sys.N];
+	jcv_point velocities[sys.N];
+	jcv_point forces[sys.N];
+	sys.diagram = &diagram;
+	sys.positions = positions;
+	sys.velocities = velocities;
+	sys.forces = forces;
 	
 
-	for (int i = 0; i < N; i++) {
-		points[i].x = drand(0, L);
-		points[i].y = drand(0, L);
+	
+	for (int i = 0; i < sys.N; i++) {
+		sys.positions[i].x = drand(0, sys.L);
+		sys.positions[i].y = drand(0, sys.L);
 	}
 
 	
-	populate_points(points, N, L);
 	
-
-	
-	jcv_diagram_generate(9*N, points, &bounding_box, NULL, &diagram);
-	sites = jcv_diagram_get_sites(&diagram);
-	
-
-
-	//char filename[256];
-	jcv_point force[N];
-	
-	system("mkdir -p dump");
+	int info = system("mkdir -p dump");
 	file = fopen("dump/a.dump", "w");
-	for (int m = 0; m < M; m++){
-		if (m%10 == 0){
-			saveTXT(file, points, N, m, L);
+	for (int m = 0; m < sys.M; m++){
+		populate_points(sys.positions, sys.N, sys.L);
+		jcv_diagram_generate(9*sys.N, sys.positions, NULL, 0, sys.diagram);
+		sys.sites = jcv_diagram_get_sites(sys.diagram);
+
+		if (m%25 == 0){
+			saveTXT(file, sys.positions, sys.N, m, sys.L);
 			//sprintf(filename, "dump/%d.txt", m);
 			//write(file, filename, points, sites, N);
 		}
-		for (int i = 0; i < 9*N; i++){
-			
-			if (sites[i].index >= N) continue;
-			force[sites[i].index] = get_edge_force_ii(sites + i);
-			graph_edge = sites[i].edges;
-			while (graph_edge){
-				jcv_point force_ji = get_edge_force_ji(sites + i, graph_edge);
-				force[sites[i].index].x += force_ji.x;
-				force[sites[i].index].y += force_ji.y;
-				graph_edge = graph_edge->next;
-			}
+		compute_force(&sys);
+
+
+		for (int i = 0; i < sys.N; i++){
+			sys.positions[i].x = pbc(sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
+			sys.positions[i].y = pbc(sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
 		}
-
-
-		jcv_point f = {0, 0};
-		for (int i = 0; i < N; i++){
-			points[i].x = pbc(points[i].x + dt*force[i].x, L);
-			points[i].y = pbc(points[i].y + dt*force[i].y, L);
-			f.x += force[i].x;
-			f.y += force[i].y;
-		}
-		printf("m = %d, f = (%f, %f), E = %f \n", m, f.x, f.y, energy(sites, N));
-	
-
-		populate_points(points, N, L);
-
-		jcv_diagram_generate(9*N, points, NULL, 0, &diagram);
-		sites = jcv_diagram_get_sites(&diagram);
+		printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, &sys.parameter));
+		
 	}
-	
+	return 1;
 }
 
+
+void constantInit(int argc, char *argv[], data* sys){
+
+
+	struct option longopt[] = {
+		{"number", required_argument, NULL, 'N'},
+		{"Po", required_argument, NULL, 'p'},
+        {"Ao", required_argument, NULL, 'a'},
+        {"Ka", required_argument, NULL, 'k'},
+        {"Kp", required_argument, NULL, 'P'},
+		{"dt", required_argument, NULL, 'D'},
+		{"M", required_argument, NULL, 'm'},
+		{NULL, 0, NULL, 0}
+	};
+	
+
+    int c;
+
+    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:", longopt, NULL)) != -1){
+        switch(c){
+            case 'N':
+                sscanf(optarg, "%d", &sys->N);
+                break;
+            case 'p':
+                sscanf(optarg, "%f", &sys->parameter.Po);
+                break;
+            case 'a':
+                sscanf(optarg, "%f", &sys->parameter.Ao);
+                break;
+            case 'k':
+                sscanf(optarg, "%f", &sys->parameter.Ka);
+                break;
+            case 'P':
+                sscanf(optarg, "%f", &sys->parameter.Kp);
+                break;
+            case 'D':
+                sscanf(optarg, "%f", &sys->dt);
+                break;
+            case 'm':
+                sscanf(optarg, "%d", &sys->M);
+                break;
+        }
+    }
+    sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
+}
 
