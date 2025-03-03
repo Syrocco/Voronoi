@@ -9,8 +9,8 @@ CXXFLAGS_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11
 LDFLAGS_DEBUG = -lm
 
 # Full debug configuration with sanitizers
-CXXFLAGS_FULL_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11 -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=thread
-LDFLAGS_FULL_DEBUG = -lm -fsanitize=address -fsanitize=undefined -fsanitize=leak -fsanitize=thread
+CXXFLAGS_FULL_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11 -fsanitize=address -fsanitize=undefined -fsanitize=leak
+LDFLAGS_FULL_DEBUG = -lm 
 
 TARGET = voronoi
 SRC = voronoi.c helper.c force.c

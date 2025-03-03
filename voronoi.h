@@ -25,11 +25,14 @@ struct data_
     const jcv_site* sites;
 
     jcv_real L, dL;
+    jcv_real gamma_rate;
+    jcv_real deformation_by_lenght;
     jcv_real dt;
     parameter parameter;
     int N;
     int M;
     int N_pbc;
+    int i;
 
     FILE* file;
 };

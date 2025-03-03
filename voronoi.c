@@ -35,11 +35,12 @@ int main(int argc, char *argv[]){
     sys.parameter.Po = 3.7;
     sys.parameter.Ka = 1.0;
     sys.parameter.Kp = 1.0;
-    sys.N = 100;
-    sys.M = 200; 
+    sys.N = 10000;
+    sys.M = 1; 
     sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
     sys.dt = 0.1;
-    
+    sys.gamma_rate = 3;
+    sys.i = 0;
     
     constantInit(argc, argv, &sys);
     
@@ -60,21 +61,28 @@ int main(int argc, char *argv[]){
         addBoundary(&sys, i);
     }
     
-    for (int m = 0; m < sys.M; m++){
-        
+    for (sys.i = 0; sys.i < sys.M; sys.i++){
+        sys.deformation_by_lenght = (sys.i + 1)*sys.dt*sys.gamma_rate;
         TIME_FUNCTION(jcv_diagram_generate, sys.N_pbc, sys.positions, NULL, 0, sys.diagram);
         sys.sites = jcv_diagram_get_sites(sys.diagram);
-        printf("m = %d, E = %f \n", m, energy(sys.sites, sys.N, sys.N_pbc, &sys.parameter));
+        printf("m = %d, E = %f \n", sys.i, energy(sys.sites, sys.N, sys.N_pbc, &sys.parameter));
 
-        if (m%1000 == 0){
-            saveTXT(sys.file, sys.positions, sys.N_pbc, m, sys.L);
+        if (sys.i%1 == 0){
+            saveTXT(sys.file, sys.positions, sys.N_pbc, sys.i, sys.L);
 
+            sys.N_pbc = sys.N;
+            for (int i = 0; i < sys.N; i++){
             
+                sys.positions[i].x += sys.positions[i].y*sys.deformation_by_lenght;
+                pbc(&sys.positions[i], sys.L, sys.deformation_by_lenght);
+                addBoundary(&sys, i);
+            }
 			char filename[100];
             sprintf(filename, "dump/a.txt");
 			FILE* file = fopen(filename, "w");
-            write(file, filename, sys.positions, sys.sites, sys.N, sys.N_pbc);
+            write(file, filename, sys.positions, sys.sites, sys.N_pbc, sys.N_pbc);
 			fclose(file);
+            exit(3);
             
         }
 
@@ -84,8 +92,9 @@ int main(int argc, char *argv[]){
         sys.N_pbc = sys.N;
         for (int i = 0; i < sys.N; i++){
             
-            sys.positions[i].x = pbc(sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
-            sys.positions[i].y = pbc(sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1), sys.L);
+            sys.positions[i].x = sys.positions[i].x + sys.dt*sys.forces[i].x + JCV_SQRT(sys.dt)*drand(-0.1, 0.1);
+            sys.positions[i].y = sys.positions[i].y + sys.dt*sys.forces[i].y + JCV_SQRT(sys.dt)*drand(-0.1, 0.1);
+            pbc(&sys.positions[i], sys.L, sys.dt*sys.i*sys.L);
             addBoundary(&sys, i);
         }
         

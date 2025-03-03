@@ -24,7 +24,7 @@ void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L);
 void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N, int N_pbc);
 
 void populate_points(jcv_point* points, int N, jcv_real L);
-jcv_real pbc(jcv_real x, jcv_real L);
+void pbc(jcv_point* p, jcv_real L, jcv_real dL);
 void addBoundary(data* sys, int i);
 
 double drand(double min, double max);

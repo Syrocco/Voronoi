@@ -149,30 +149,52 @@ void populate_points(jcv_point* points, int N, jcv_real L){
 	}
 }
 
-jcv_real pbc(jcv_real x, jcv_real L){
-    return fmod(x + L, L);
+void pbc(jcv_point* p, jcv_real L, jcv_real deformation_by_lenght){
+    if (p->y < 0){
+        p->y += L;
+        p->x += deformation_by_lenght*L;
+    }
+    else if (p->y > L){
+        p->y -= L;
+        p->x -= deformation_by_lenght*L;
+    }
+
+    if (p->x - p->y*deformation_by_lenght < 0){
+        p->x += L;
+    }
+    else if (p->x - p->y*deformation_by_lenght > L){
+        p->x -= L;
+    }
 }
 
 void addBoundary(data* sys, int i){
-    int left = sys->positions[i].x / sys->L < sys->dL;
-    int right = sys->positions[i].x / sys->L > 1 - sys->dL;
-    int bottom = sys->positions[i].y / sys->L < sys->dL;
-    int top = sys->positions[i].y / sys->L > 1 - sys->dL;
+    jcv_real deformation_by_lenght = sys->deformation_by_lenght;
+    jcv_real L = sys->L;
+    jcv_real dL = sys->dL;
+
+    // Adjust the conditions for left and right boundaries
+    int left = (sys->positions[i].x - sys->positions[i].y*deformation_by_lenght)/L < dL;
+    int right = (sys->positions[i].x - sys->positions[i].y*deformation_by_lenght)/L > 1 - dL;
+    int bottom = sys->positions[i].y/L < dL;
+    int top = sys->positions[i].y/L > 1 - dL;
 
     if (left || right) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + drand(-epsilon, epsilon); //Evil af trick, Fortune's sweep does not like same x or y..
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + drand(-epsilon, epsilon);
         sys->N_pbc++;
     }
     if (bottom || top) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + drand(-epsilon, epsilon);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
+        jcv_real DL = sys->positions[sys->N_pbc].y*deformation_by_lenght;
+        sys->positions[sys->N_pbc].x += (top ? -(DL + L*deformation_by_lenght) : DL);
         sys->N_pbc++;
     }
     if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? sys->L : -sys->L) + drand(-epsilon, epsilon);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? sys->L : -sys->L) + drand(-epsilon, epsilon);
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L) + drand(-epsilon, epsilon);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L) + drand(-epsilon, epsilon);
+        jcv_real DL = sys->positions[sys->N_pbc].y*deformation_by_lenght;
+        sys->positions[sys->N_pbc].x += (top ? -(DL + L*deformation_by_lenght) : DL);
         sys->N_pbc++;
     }
-
 }

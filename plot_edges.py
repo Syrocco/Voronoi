@@ -32,6 +32,7 @@ def plot_edges(X, Y, edges):
     fig, ax = plt.subplots()
     ax.add_collection(lc)
     plt.scatter(X, Y, c = np.linspace(0, len(X), len(X)))
+    plt.scatter(X[10000:], Y[10000:], c = "black")
     plt.axis("off")
     plt.show()
 
