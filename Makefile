@@ -13,8 +13,8 @@ CXXFLAGS_FULL_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11 -fsanitize=addr
 LDFLAGS_FULL_DEBUG = -lm 
 
 TARGET = voronoi
-SRC = voronoi.c helper.c force.c
-HEADERS = helper.h force.h voronoi.h
+SRC = voronoi.c helper.c force.c initial.c
+HEADERS = helper.h force.h voronoi.h initial.h
 
 .PHONY: all default debug full_debug clean
 

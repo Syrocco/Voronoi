@@ -6,7 +6,7 @@
 /*
 Helper functions 
 */
-#define epsilon 0.0
+#define eps 0.000001
 
 inline jcv_point jcv_add(const jcv_point a, const jcv_point b){
     jcv_point c = {a.x + b.x, a.y + b.y};
@@ -100,9 +100,9 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
 }
 
-void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L){
-
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS pp pp pp\n0 %f\n0 %f\n0 %f\nITEM: ATOMS id x y z\n", m, N, L, L, 1.);
+void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L, jcv_real amount_of_def){
+    jcv_real dL = amount_of_def*L;
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y z\n", m, N, L + dL, dL, L);
     for(int i = 0; i < N; i++){
         fprintf(file, "%d %lf %lf %lf\n", i, points[i].x, points[i].y, 0.2);
     }
@@ -149,52 +149,48 @@ void populate_points(jcv_point* points, int N, jcv_real L){
 	}
 }
 
-void pbc(jcv_point* p, jcv_real L, jcv_real deformation_by_lenght){
+void pbc(jcv_point* p, jcv_real L, jcv_real amount_of_def){
     if (p->y < 0){
         p->y += L;
-        p->x += deformation_by_lenght*L;
+        p->x += amount_of_def*L;
     }
     else if (p->y > L){
         p->y -= L;
-        p->x -= deformation_by_lenght*L;
+        p->x -= amount_of_def*L;
     }
-
-    if (p->x - p->y*deformation_by_lenght < 0){
+    
+    if (p->x - p->y*amount_of_def < 0){
         p->x += L;
     }
-    else if (p->x - p->y*deformation_by_lenght > L){
+    else if (p->x - p->y*amount_of_def > L){
         p->x -= L;
     }
 }
 
+//Will not work with dL > 0.5
 void addBoundary(data* sys, int i){
-    jcv_real deformation_by_lenght = sys->deformation_by_lenght;
+    jcv_real amount_of_def = sys->amount_of_def;
     jcv_real L = sys->L;
     jcv_real dL = sys->dL;
 
     // Adjust the conditions for left and right boundaries
-    int left = (sys->positions[i].x - sys->positions[i].y*deformation_by_lenght)/L < dL;
-    int right = (sys->positions[i].x - sys->positions[i].y*deformation_by_lenght)/L > 1 - dL;
+    int left = (sys->positions[i].x - sys->positions[i].y*amount_of_def)/L < dL;
+    int right = (sys->positions[i].x - sys->positions[i].y*amount_of_def)/L > 1 - dL;
     int bottom = sys->positions[i].y/L < dL;
-    int top = sys->positions[i].y/L > 1 - dL;
-
+    int top = sys->positions[i].y/L >  1 - dL;
     if (left || right) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + drand(-epsilon, epsilon);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y;
         sys->N_pbc++;
-    }
+    } 
     if (bottom || top) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x + drand(-epsilon, epsilon);
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + amount_of_def*(bottom ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
-        jcv_real DL = sys->positions[sys->N_pbc].y*deformation_by_lenght;
-        sys->positions[sys->N_pbc].x += (top ? -(DL + L*deformation_by_lenght) : DL);
         sys->N_pbc++;
-    }
+    } 
     if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
-        sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L) + drand(-epsilon, epsilon);
-        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L) + drand(-epsilon, epsilon);
-        jcv_real DL = sys->positions[sys->N_pbc].y*deformation_by_lenght;
-        sys->positions[sys->N_pbc].x += (top ? -(DL + L*deformation_by_lenght) : DL);
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + amount_of_def*(bottom ? L : -L) + (left ? L : -L);
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
         sys->N_pbc++;
-    }
+    } 
 }

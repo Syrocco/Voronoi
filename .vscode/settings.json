@@ -8,6 +8,9 @@
         "variant": "c",
         "force.h": "c",
         "getopt.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "limits": "c",
+        "voronoi.h": "c",
+        "math.h": "c"
     }
 }

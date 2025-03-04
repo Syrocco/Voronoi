@@ -26,7 +26,7 @@ struct data_
 
     jcv_real L, dL;
     jcv_real gamma_rate;
-    jcv_real deformation_by_lenght;
+    jcv_real amount_of_def;
     jcv_real dt;
     parameter parameter;
     int N;
