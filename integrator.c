@@ -15,6 +15,9 @@
         printf("Time for %s: %f seconds\n", #func, elapsed_time); \
     } while (0)
 
+
+
+
 void eulerStep(data* sys){
 
     if ((sys->i + 1)%100 == 0){
@@ -26,32 +29,12 @@ void eulerStep(data* sys){
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     
-    if (sys->i%10 == 0){
+    if ((sys->i + 1)%100 == 0){
         printf("m = %d, E = %f \n", sys->i, energy(sys->sites, sys->N, sys->N_pbc, &sys->parameter));
         saveTXT(sys);
         
-        /* char filename[100];
-        sprintf(filename, "dump/%d.txt", sys->i);
-        FILE* file = fopen(filename, "w");
-        write(file, filename, sys->positions, sys->sites, sys->N, sys->N_pbc);
-        fclose(file);  */
     }
-    
-    /* 
-    if (sys->i > 1720){
-        char filename[100];
-        sprintf(filename, "dump/%d.txt", sys->i);
-        FILE* file = fopen(filename, "w");
-        write(file, filename, sys->positions, sys->sites, sys->N, sys->N_pbc);
-        fclose(file);
-        if (sys->i == 1730){
-            exit(3);
-        }
-    } */
-    
-        
-    
-
+            
     compute_force(sys);
 
     sys->N_pbc = sys->N;
@@ -68,6 +51,7 @@ void eulerStep(data* sys){
         forcex += sys->forces[i].x;
         forcey += sys->forces[i].y;
     }
+    
     if ((forcex*forcex + forcey*forcey) > 0.00001){
         printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
         //exit(3);
@@ -87,12 +71,11 @@ void fireStep(data* sys){
    
     const jcv_real alpha_start = 0.1;
     jcv_real alpha_now = alpha_start;
-    const jcv_real f_inc = 1.3;
+    const jcv_real f_inc = 1.1;
     const jcv_real f_dec = 0.5;
     const jcv_real f_alpha = 0.99;
     const int N_min = 5;
     jcv_real dt_now = sys->dt;
-    jcv_real dt_max = sys->dt;
 
     for (int i = 0; i < sys->N; i++){
         sys->velocities[i].x = 0;
@@ -126,7 +109,7 @@ void fireStep(data* sys){
                 sys->velocities[i].y = (1.0 - alpha_now)*sys->velocities[i].y + alpha_now*sys->forces[i].y*(vnorm/fnorm);
             }
             if (n_pos > N_min) {
-                dt_now = jcv_min(dt_now*f_inc, dt_max);
+                dt_now = dt_now*f_inc;
                 alpha_now *= f_alpha;
             }
         } 

@@ -3,6 +3,7 @@ from glob import glob
 import os
 import numpy as np
 from matplotlib.collections import LineCollection
+from scipy.spatial import Voronoi, voronoi_plot_2d
 
 def read_edges(filename):
     edges = set()
@@ -26,7 +27,7 @@ def read_edges(filename):
     print("Finished reading edges and points")
     return N, X, Y, edges
 
-def plot_edges(N, X, Y, edges, show = True):
+def plot_edges(N, X, Y, edges, show = True, plot_voronoi = False):
     lines = [ [edge[0], edge[1]] for edge in edges ]
     lc = LineCollection(lines, colors='b', linewidths=1)
 
@@ -35,15 +36,26 @@ def plot_edges(N, X, Y, edges, show = True):
     ax.add_collection(lc)
     plt.scatter(X[:N], Y[:N], c = np.linspace(0, len(X[:N]), len(X[:N])))
     plt.scatter(X[N:], Y[N:], c = "black")
+    xlim = plt.xlim()
+    ylim = plt.ylim()
+    if plot_voronoi:
+        points = np.column_stack((X, Y)) 
+        vor = Voronoi(points)
+
+        for simplex in vor.ridge_vertices:
+            if -1 not in simplex:  
+                vertices = vor.vertices[simplex]
+                plt.plot(vertices[:, 0], vertices[:, 1], 'r--', linewidth=1, alpha=0.9)
+        plt.xlim(xlim)
+        plt.ylim(ylim)
     plt.axis("off")
-    if show:
-        plt.show()
+
+    plt.show()
 
 if __name__ == "__main__":
     if 1:
-        N, X, Y, edges = read_edges('dump/1300.txt')
-        plot_edges(N, X, Y, edges)
-        
+        N, X, Y, edges = read_edges('dump/99.txt')
+        plot_edges(N, X, Y, edges, plot_voronoi = False)
     else:
         liste = glob("dump/*.txt")
         for num, i in enumerate(liste):

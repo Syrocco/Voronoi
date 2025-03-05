@@ -10,7 +10,7 @@ jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const
     if (jcv_real_eq(h72, 0) || jcv_real_eq(h23, 0)) { 
         //return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
     }
-    jcv_point opp = {h3->y - h7->y, h3->x - h7->x};
+    jcv_point opp = {h3->y - h7->y, -h3->x + h7->x};
     jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
 
     jcv_point perimeter_last = jcv_add(jcv_mul(1/h72, jcv_sub(*h2, *h7)), jcv_mul(1/h23, jcv_sub(*h2, *h3)));
@@ -105,15 +105,15 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     jcv_real dE_dry = 0;
     jcv_real jacobian[2][2] = {{0, 0}, {0, 0}};
 
-    jcv_real area = jcv_area(si);
-    jcv_real perimeter = jcv_perimeter(si);
+    jcv_real A = jcv_area(si);
+    jcv_real P = jcv_perimeter(si);
     while (edge_after != NULL){
 
         rj = &(edge->neighbor->p);
         rk = &(edge_after->neighbor->p);
         derivative(ri, rj, rk, jacobian);
 
-        jcv_point dE_dh = force_h(area, perimeter, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
+        jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
         dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
         dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
@@ -123,10 +123,10 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
 
     //Last triangle in Delaunay made of last edge and first edge
     derivative(ri, rk, &(si->edges->neighbor->p), jacobian);
-    jcv_point dE_dh = force_h(area, perimeter, &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
+    jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
     dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
     dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
-
+    //printf("ri = (%f, %f), rj = (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rk->x, rk->y, si->edges->neighbor->p.x, si->edges->neighbor->p.y);
     
 
     return (jcv_point){-dE_drx, -dE_dry};
@@ -145,9 +145,10 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jcv_real rij_sq = jcv_lenght_sq(&rij);
     jcv_real D = 2*rij_cross_rjk*rij_cross_rjk;
 
-    if (D == 0)
+    if (D == 0){
        printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
-
+        exit(3);
+    }
     jcv_real alpha = rjk_sq*jcv_dot(rij, rik)/D;
     jcv_real beta = rik_sq*jcv_dot(rji, rjk)/D;
     jcv_real gamma = rij_sq*jcv_dot(rki, rkj)/D;
@@ -170,6 +171,11 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[1][0] = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
     // ∂h.y/∂ri.y 
     jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
+
+    //jcv_real x, y;
+    //x = alpha*ri->x + beta*rj->x + gamma*rk->x;
+    //y = alpha*ri->y + beta*rj->y + gamma*rk->y;
+    //printf("h = (%f, %f)\n", x, y);
 }
 
 void compute_force(data* sys){
@@ -178,9 +184,9 @@ void compute_force(data* sys){
         if (sys->sites[i].index >= sys->N) continue;
         sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter); //∂Ei/∂ri
         jcv_graphedge* graph_edge = sys->sites[i].edges;
-        while (graph_edge){ //looping over neighbors
+        while (graph_edge){ //looping over neighbors: graph_edge is in common between i and j
             jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, &sys->parameter); //∂Ej/∂ri
-            sys->forces[sys->sites[i].index].x += force_ji.x;
+            sys->forces[sys->sites[i].index].x += force_ji.x;                                   
             sys->forces[sys->sites[i].index].y += force_ji.y;
             graph_edge = graph_edge->next;
         }

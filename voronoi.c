@@ -19,12 +19,12 @@ int main(int argc, char *argv[]){
 
     data sys;
     sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 4;
+    sys.parameter.Po = 3.9;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
-    sys.N = 100;
-    sys.M = 620; 
-    sys.dt = 0.005;
+    sys.N = 400;
+    sys.M = 62000; 
+    sys.dt = 0.1;
     sys.T = 0.;
     sys.gamma_rate = 0.0;
     
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]){
     
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
-    jcv_point positions[9*sys.N];
+    jcv_point positions[9*sys.N]; //9*sys.N == max N_pbc
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
     sys.diagram = &diagram;
@@ -51,8 +51,8 @@ int main(int argc, char *argv[]){
         
         
         
-        eulerStep(&sys);
-        //fireStep(&sys);
+        //eulerStep(&sys);
+        fireStep(&sys);
 
         
     }
