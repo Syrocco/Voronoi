@@ -150,7 +150,7 @@ void pbc(jcv_point* p, jcv_real L, jcv_real amount_of_def){
 
 //Will not work with dL > 0.5
 void addBoundary(data* sys, int i){
-    int val = 2;
+    /* int val = 1;
     for (int l = -val; l <= val; l++){
         for (int j = -val; j <= val; j++){
             if (l == 0 && j == 0) continue;
@@ -158,9 +158,9 @@ void addBoundary(data* sys, int i){
             sys->positions[sys->N_pbc].y = sys->positions[i].y + j*sys->L;
             sys->N_pbc++;
         }
-    }
+    } */
 
-    /* jcv_real amount_of_def = sys->amount_of_def;
+    jcv_real amount_of_def = sys->amount_of_def;
     jcv_real L = sys->L;
     jcv_real dL = sys->dL;
 
@@ -183,5 +183,5 @@ void addBoundary(data* sys, int i){
         sys->positions[sys->N_pbc].x = sys->positions[i].x + amount_of_def*(bottom ? L : -L) + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
         sys->N_pbc++;
-    }  */
+    } 
 }

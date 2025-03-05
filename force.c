@@ -40,16 +40,20 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
         runner = runner->next;
     }
 
-    // If next_edge is still NULL, it means the edge was not found
-    if (runner == NULL) {
-        next_edge = edgej;
-    }
-    else{
+    // If runner is not NULL, next_edge is the runner. 
+    // Otherwise it's the edge from which we started
+    if (runner != NULL) {
         next_edge = runner;
     }
+    else{
+        next_edge = edgej;
+    }
 
-    // If prev_edge is still NULL, it means the edge was the first one
+    // If prev_edge is still NULL, it means the edge
+    // in common was the first one, and next_edge is 
+    // the last one .
     if (prev_edge == NULL) {
+        runner = edgej;
         while (runner->next != NULL) {
             runner = runner->next;
         }
@@ -71,7 +75,7 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
 
     jcv_point dEj_dh2 = force_h(Aj, Pj, h7, h2, h3, param);
     jcv_point dEj_dh3 = force_h(Aj, Pj, h2, h3, h8, param);
-
+    
     jcv_real jacobian_h2[2][2] = {{0, 0}, {0, 0}};
     jcv_real jacobian_h3[2][2] = {{0, 0}, {0, 0}};
 
@@ -108,8 +112,8 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
 
         rj = &(edge->neighbor->p);
         rk = &(edge_after->neighbor->p);
-
         derivative(ri, rj, rk, jacobian);
+
         jcv_point dE_dh = force_h(area, perimeter, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
         dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
         dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
@@ -124,7 +128,8 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
     dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
 
-    //printf("%f %f \n", si->edges->pos[0].x, edge->pos[1].x);
+    
+
     return (jcv_point){-dE_drx, -dE_dry};
 
 }
@@ -172,10 +177,10 @@ void compute_force(data* sys){
 
     for (int i = 0; i < sys->N_pbc; i++){
         if (sys->sites[i].index >= sys->N) continue;
-        sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter);
+        sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter); //∂Ei/∂ri
         jcv_graphedge* graph_edge = sys->sites[i].edges;
-        while (graph_edge){
-            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, &sys->parameter);
+        while (graph_edge){ //looping over neighbors
+            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, &sys->parameter); //∂Ej/∂ri
             sys->forces[sys->sites[i].index].x += force_ji.x;
             sys->forces[sys->sites[i].index].y += force_ji.y;
             graph_edge = graph_edge->next;

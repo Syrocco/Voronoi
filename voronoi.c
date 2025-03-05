@@ -19,13 +19,13 @@ int main(int argc, char *argv[]){
 
     data sys;
     sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 4.5;
-    sys.parameter.Ka = 1.0;
-    sys.parameter.Kp = 1.0;
-    sys.N = 2;
-    sys.M = 10; 
+    sys.parameter.Po = 3.5;
+    sys.parameter.Ka = 1;
+    sys.parameter.Kp = 1;
+    sys.N = 100;
+    sys.M = 25000; 
     sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
-    sys.dt = 0.01;
+    sys.dt = 0.005;
     sys.gamma_rate = 0.0;
     sys.i = 0;
     sys.amount_of_def = 0;
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]){
     
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
-    jcv_point positions[27*sys.N];
+    jcv_point positions[9*sys.N];
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
     sys.diagram = &diagram;

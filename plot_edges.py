@@ -26,7 +26,7 @@ def read_edges(filename):
     print("Finished reading edges and points")
     return N, X, Y, edges
 
-def plot_edges(N, X, Y, edges):
+def plot_edges(N, X, Y, edges, show = True):
     lines = [ [edge[0], edge[1]] for edge in edges ]
     lc = LineCollection(lines, colors='b', linewidths=1)
 
@@ -36,17 +36,20 @@ def plot_edges(N, X, Y, edges):
     plt.scatter(X[:N], Y[:N], c = np.linspace(0, len(X[:N]), len(X[:N])))
     plt.scatter(X[N:], Y[N:], c = "black")
     plt.axis("off")
-    plt.show()
+    if show:
+        plt.show()
 
 if __name__ == "__main__":
     if 1:
-        N, X, Y, edges = read_edges('dump/a.txt')
+        N, X, Y, edges = read_edges('dump/1300.txt')
         plot_edges(N, X, Y, edges)
         
     else:
         liste = glob("dump/*.txt")
-        for i in liste:
-            X, Y, edges = read_edges(i)
-            plot_edges(X, Y, edges)
-            plt.savefig(i.replace("dump", "images").replace(".txt", ".png"))
+        for num, i in enumerate(liste):
+            N, X, Y, edges = read_edges(i)
+            plot_edges(N, X, Y, edges)
+            plt.xlim(0, np.sqrt(N)*1.05)
+            plt.ylim(0, np.sqrt(N)*1.05)
+            plt.savefig(f"images/{num:03}.png", pad_inches=0, bbox_inches="tight")
             plt.close()

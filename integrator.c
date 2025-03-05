@@ -25,17 +25,31 @@ void eulerStep(data* sys){
 
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
-    printf("m = %d, E = %f \n", sys->i, energy(sys->sites, sys->N, sys->N_pbc, &sys->parameter));
-
+    
     if (sys->i%10 == 0){
+        printf("m = %d, E = %f \n", sys->i, energy(sys->sites, sys->N, sys->N_pbc, &sys->parameter));
         saveTXT(sys);
-
+        
+        /* char filename[100];
+        sprintf(filename, "dump/%d.txt", sys->i);
+        FILE* file = fopen(filename, "w");
+        write(file, filename, sys->positions, sys->sites, sys->N, sys->N_pbc);
+        fclose(file);  */
+    }
+    
+    /* 
+    if (sys->i > 1720){
         char filename[100];
-        sprintf(filename, "dump/a.txt");
+        sprintf(filename, "dump/%d.txt", sys->i);
         FILE* file = fopen(filename, "w");
         write(file, filename, sys->positions, sys->sites, sys->N, sys->N_pbc);
         fclose(file);
-    }
+        if (sys->i == 1730){
+            exit(3);
+        }
+    } */
+    
+        
     
 
     compute_force(sys);
@@ -44,15 +58,15 @@ void eulerStep(data* sys){
     jcv_real forcex = 0;
     jcv_real forcey = 0;
     for (int i = 0; i < sys->N; i++){
-        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + 0*JCV_SQRT(sys->dt)*drand(-0.1, 0.1);
-        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + 0*JCV_SQRT(sys->dt)*drand(-0.1, 0.1);
+        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + 0*JCV_SQRT(sys->dt)*drand(-1, 1);
+        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + 0*JCV_SQRT(sys->dt)*drand(-1, 1);
         sys->positions[i].x = sys->positions[i].x + sys->gamma_rate*sys->dt*sys->positions[i].y;
         pbc(&sys->positions[i], sys->L, sys->amount_of_def);
         addBoundary(sys, i);
         forcex += sys->forces[i].x;
         forcey += sys->forces[i].y;
     }
-    if (forcex>0.00001 || forcey>0.00001){
+    if ((forcex*forcex + forcey*forcey) > 0.00001){
         printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
         //exit(3);
     }
