@@ -185,3 +185,11 @@ void addBoundary(data* sys, int i){
         sys->N_pbc++;
     } 
 }
+
+//Box Muller gaussian number generator
+void gaussian(jcv_real* n1, jcv_real* n2){
+    jcv_real u1 = drand(0, 1);
+    jcv_real u2 = drand(0, 1);
+    *n1 = JCV_SQRT(-2*JCV_LOG(u1))*JCV_COS(2*JCV_PI*u2);
+    *n2 = JCV_SQRT(-2*JCV_LOG(u1))*JCV_SIN(2*JCV_PI*u2);
+}

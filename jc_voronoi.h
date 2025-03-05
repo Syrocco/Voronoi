@@ -45,6 +45,24 @@ extern "C" {
     #define JCV_SQRT(_X_) sqrtf(_X_)
 #endif
 
+#if JCV_type == 1
+    #define JCV_COS(_X_) cos(_X_)
+#else    
+    #define JCV_COS(_X_) cosf(_X_)
+#endif
+
+#if JCV_type == 1
+    #define JCV_SIN(_X_) sin(_X_)
+#else
+    #define JCV_SIN(_X_) sinf(_X_)
+#endif
+
+#if JCV_type == 1
+    #define JCV_LOG(_X_) log(_X_)
+#else
+    #define JCV_LOG(_X_) logf(_X_)
+#endif
+
 
 #ifndef JCV_PI
     #define JCV_PI 3.14159265358979323846264338327950288f

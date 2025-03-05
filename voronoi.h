@@ -29,6 +29,7 @@ struct data_
     jcv_real amount_of_def;
     jcv_real dt;
     parameter parameter;
+    jcv_real T;
     int N;
     int M;
     int N_pbc; //N + number of boundary points

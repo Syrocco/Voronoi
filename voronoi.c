@@ -19,12 +19,13 @@ int main(int argc, char *argv[]){
 
     data sys;
     sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 3.5;
+    sys.parameter.Po = 4;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
     sys.N = 100;
-    sys.M = 25000; 
+    sys.M = 620; 
     sys.dt = 0.005;
+    sys.T = 0.;
     sys.gamma_rate = 0.0;
     
     constantInit(argc, argv, &sys);
@@ -43,7 +44,7 @@ int main(int argc, char *argv[]){
 
     //randomInitial(&sys);
     
-    rsaInitial(&sys, 0.1);
+    rsaInitial(&sys, 0.4);
     
 
     for (sys.i = 0; sys.i < sys.M; sys.i++){
@@ -74,13 +75,14 @@ void constantInit(int argc, char *argv[], data* sys){
         {"dt", required_argument, NULL, 'D'},
         {"time", required_argument, NULL, 'M'},
         {"dL", required_argument, NULL, 'd'},
+        {"temperature", required_argument, NULL, 'T'},
         {NULL, 0, NULL, 0}
     };
     
 
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:", longopt, NULL)) != -1){
+    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:T:", longopt, NULL)) != -1){
         switch(c){
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
@@ -130,6 +132,13 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->dL);
                 #endif
                 control_dL = 1;
+                break;
+            case 'T':
+                #if JCV_type == 0
+                    sscanf(optarg, "%f", &sys->T);
+                #else
+                    sscanf(optarg, "%lf", &sys->T);
+                #endif
                 break;
         }
     }

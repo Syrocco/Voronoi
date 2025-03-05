@@ -27,4 +27,6 @@ void pbc(jcv_point* p, jcv_real L, jcv_real amount_of_def);
 void addBoundary(data* sys, int i);
 
 double drand(double min, double max);
+void gaussian(jcv_real* n1, jcv_real* n2);
+
 #endif // HELPER_H
