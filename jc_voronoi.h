@@ -16,29 +16,47 @@
 extern "C" {
 #endif
 
-#ifndef JCV_REAL_TYPE
+
+#define JCV_type 1
+
+#if JCV_type == 1
+    #define JCV_REAL_TYPE double
+#else
     #define JCV_REAL_TYPE float
 #endif
 
-#ifndef JCV_REAL_TYPE_EPSILON
+#if JCV_type == 1
+    #define JCV_REAL_TYPE_EPSILON DBL_EPSILON
+#else
     #define JCV_REAL_TYPE_EPSILON FLT_EPSILON
 #endif
 
-#ifndef JCV_ATAN2
-    #define JCV_ATAN2(_Y_, _X_) atan2f(_Y_, _X_)
+
+#if JCV_type == 1
+    #define JCV_ATAN2(_Y_, _X_) atan2(_Y_, _X_) 
+#else
+    #define JCV_ATAN2(_Y_, _X_) atan2f(_Y_, _X_) 
 #endif
 
-#ifndef JCV_SQRT
-    #define JCV_SQRT(_X_)       sqrtf(_X_)
+
+#if JCV_type == 1
+    #define JCV_SQRT(_X_) sqrt(_X_)
+#else
+    #define JCV_SQRT(_X_) sqrtf(_X_)
 #endif
+
 
 #ifndef JCV_PI
     #define JCV_PI 3.14159265358979323846264338327950288f
 #endif
 
-#ifndef JCV_FLT_MAX
+
+#if JCV_type == 1
+    #define JCV_FLT_MAX 1.7976931348623157E+308
+#else
     #define JCV_FLT_MAX 3.402823466e+38F
 #endif
+
 
 #ifndef JCV_EDGE_INTERSECT_THRESHOLD
     // Fix for Issue #40
@@ -114,6 +132,8 @@ extern int jcv_boxshape_test(const jcv_clipper* clipper, const jcv_point p);
 extern int jcv_boxshape_clip(const jcv_clipper* clipper, jcv_edge* e);
 extern void jcv_boxshape_fillgaps(const jcv_clipper* clipper, jcv_context_internal* allocator, jcv_site* s);
 
+jcv_real jcv_min(jcv_real a, jcv_real b);
+jcv_real jcv_max(jcv_real a, jcv_real b);
 jcv_real jcv_abs(jcv_real v);
 jcv_real jcv_point_dist(const jcv_point* pt1, const jcv_point* pt2);
 int jcv_real_eq(jcv_real a, jcv_real b);
@@ -244,11 +264,11 @@ static inline jcv_real jcv_ceil(jcv_real v) {
     return (v > i) ? i + 1 : i;
 }
 
-static inline jcv_real jcv_min(jcv_real a, jcv_real b) {
+inline jcv_real jcv_min(jcv_real a, jcv_real b) {
     return a < b ? a : b;
 }
 
-static inline jcv_real jcv_max(jcv_real a, jcv_real b) {
+inline jcv_real jcv_max(jcv_real a, jcv_real b) {
     return a > b ? a : b;
 }
 

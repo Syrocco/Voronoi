@@ -18,9 +18,8 @@ jcv_real jcv_area(const jcv_site* a);
 jcv_real jcv_lenght(const jcv_point* a);
 jcv_real jcv_lenght_sq(const jcv_point* a);
 
-void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_real jacobian[2][2]);
 
-void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L, jcv_real amount_of_def);
+void saveTXT(data* sys);
 void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N, int N_pbc);
 
 void populate_points(jcv_point* points, int N, jcv_real L);

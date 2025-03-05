@@ -11,6 +11,10 @@
         "stdio.h": "c",
         "limits": "c",
         "voronoi.h": "c",
-        "math.h": "c"
+        "math.h": "c",
+        "integrator.h": "c",
+        "initial.h": "c",
+        "climits": "cpp",
+        "stdint.h": "c"
     }
 }

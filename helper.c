@@ -65,46 +65,27 @@ inline jcv_real jcv_lenght_sq(const jcv_point* a){
 }
 
 
-void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_real jacobian[2][2]){
-    jcv_point rij = jcv_sub(*ri, *rj);
-    jcv_point rik = jcv_sub(*ri, *rk);
-    jcv_point rjk = jcv_sub(*rj, *rk);
-    jcv_point rji = jcv_sub(*rj, *ri);
-    jcv_point rkj = jcv_sub(*rk, *rj);
-    jcv_point rki = jcv_sub(*rk, *ri);
-    jcv_real rij_cross_rjk = jcv_cross(rij, rjk);
-    jcv_real rjk_sq = jcv_lenght_sq(&rjk);
-    jcv_real rij_sq = jcv_lenght_sq(&rij);
-    jcv_real rik_sq = jcv_lenght_sq(&rik);
-    jcv_real D = 2*rij_cross_rjk*rij_cross_rjk;
-    if (D == 0)
-       printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
 
-    jcv_real alpha = rjk_sq*jcv_dot(rij, rik)/D;
-    jcv_real beta = rik_sq*jcv_dot(rji, rjk)/D;
-    jcv_real gamma = rij_sq*jcv_dot(rki, rkj)/D;
-
-    //Derivative of D
-    jcv_real point = jcv_cross(rij, rjk);
-    jcv_point dDdri = {4*rjk.y*point, -4*rjk.x*point};
-
-    jcv_point dalphadri = jcv_sub(jcv_mul(rjk_sq/D, jcv_add(rij, rik)), jcv_mul(alpha/D, dDdri));
-    jcv_point dbetadri = jcv_sub(jcv_add(jcv_mul(2*jcv_dot(rji, rjk)/D, rik), jcv_mul(-rik_sq/D, rjk)), jcv_mul(beta/D, dDdri));
-    jcv_point dgammadri = jcv_sub(jcv_add(jcv_mul(2*jcv_dot(rki, rkj)/D, rij), jcv_mul(-rij_sq/D, rkj)), jcv_mul(gamma/D, dDdri));
-
-
-    //first index = derivative, second index = h
-    jacobian[0][0] = alpha + dalphadri.x*ri->x + dbetadri.x*rj->x + dgammadri.x*rk->x;
-    jacobian[0][1] = dalphadri.x*ri->y + dbetadri.x*rj->y + dgammadri.x*rk->y;
-    jacobian[1][0] = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
-    jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
-}
-
-void saveTXT(FILE* file, const jcv_point* points, int N, int m, jcv_real L, jcv_real amount_of_def){
+void saveTXT(data* sys){
+    FILE* file = sys->file;
+    jcv_real amount_of_def = sys->amount_of_def;
+    jcv_real L = sys->L;    
+    jcv_point* points = sys->positions;
+    int N = sys->N;
+    int m = sys->i;
+    jcv_point* forces = sys->forces;
+    jcv_point* velocities = sys->velocities;
     jcv_real dL = amount_of_def*L;
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y z\n", m, N, L + dL, dL, L);
-    for(int i = 0; i < N; i++){
-        fprintf(file, "%d %lf %lf %lf\n", i, points[i].x, points[i].y, 0.2);
+    int N_pbc = sys->N_pbc;
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy\n", m, N_pbc, L + dL, dL, L);
+    for(int i = 0; i < N_pbc; i++){
+        if (i >= N){
+            fprintf(file, "%d %lf %lf %lf %lf %lf %lf\n", i, points[i].x, points[i].y, 0.0, 0.0, 0.0, 0.0);
+            continue;
+        }
+        else{
+            fprintf(file, "%d %lf %lf %lf %lf %lf %lf\n", i, points[i].x, points[i].y, velocities[i].x, velocities[i].y, forces[i].x, forces[i].y);
+        }
     }
     fflush(file);
 }
@@ -116,14 +97,14 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
         exit(1);
     }
 
-    fprintf(file, "%d\n", N);
-    for (int i = 0; i < N; i++) {
+    fprintf(file, "%d %d\n", N, N_pbc);
+    for (int i = 0; i < N_pbc; i++) {
         fprintf(file, "%f %f\n", (float)points[i].x, (float)points[i].y);
     }
 
     const jcv_graphedge* graph_edge;
     for (int i = 0; i < N_pbc; i++){
-        if (sites[i].index >= N) continue;
+        //if (sites[i].index >= N) continue;
 
         graph_edge = sites[i].edges;
         while (graph_edge) {
@@ -169,7 +150,17 @@ void pbc(jcv_point* p, jcv_real L, jcv_real amount_of_def){
 
 //Will not work with dL > 0.5
 void addBoundary(data* sys, int i){
-    jcv_real amount_of_def = sys->amount_of_def;
+    int val = 2;
+    for (int l = -val; l <= val; l++){
+        for (int j = -val; j <= val; j++){
+            if (l == 0 && j == 0) continue;
+            sys->positions[sys->N_pbc].x = sys->positions[i].x + l*sys->L;
+            sys->positions[sys->N_pbc].y = sys->positions[i].y + j*sys->L;
+            sys->N_pbc++;
+        }
+    }
+
+    /* jcv_real amount_of_def = sys->amount_of_def;
     jcv_real L = sys->L;
     jcv_real dL = sys->dL;
 
@@ -192,5 +183,5 @@ void addBoundary(data* sys, int i){
         sys->positions[sys->N_pbc].x = sys->positions[i].x + amount_of_def*(bottom ? L : -L) + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
         sys->N_pbc++;
-    } 
+    }  */
 }
