@@ -46,14 +46,13 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
         next_edge = runner;
     }
     else{
-        next_edge = edgej;
+        next_edge = sj->edges;
     }
 
     // If prev_edge is still NULL, it means the edge
-    // in common was the first one, and next_edge is 
-    // the last one .
+    // in common between i and j was the first one, 
+    // and prev_edge is the last one.
     if (prev_edge == NULL) {
-        runner = edgej;
         while (runner->next != NULL) {
             runner = runner->next;
         }
