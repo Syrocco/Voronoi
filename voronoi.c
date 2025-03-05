@@ -24,11 +24,8 @@ int main(int argc, char *argv[]){
     sys.parameter.Kp = 1;
     sys.N = 100;
     sys.M = 25000; 
-    sys.L = JCV_SQRT((JCV_REAL_TYPE)sys.N);;
     sys.dt = 0.005;
     sys.gamma_rate = 0.0;
-    sys.i = 0;
-    sys.amount_of_def = 0;
     
     constantInit(argc, argv, &sys);
     
@@ -137,6 +134,9 @@ void constantInit(int argc, char *argv[], data* sys){
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
+    sys->i = 0;
+    sys->amount_of_def = 0;
+
 	int info = system("mkdir -p dump");
 	if (info != 0) {
         fprintf(stderr, "Error: Failed to create directory 'dump'\n");

@@ -24,14 +24,14 @@ struct data_
     jcv_point* forces;
     const jcv_site* sites;
 
-    jcv_real L, dL;
+    jcv_real L, dL; //dL = fraction of L to include at the boundaries for pbc
     jcv_real gamma_rate;
     jcv_real amount_of_def;
     jcv_real dt;
     parameter parameter;
     int N;
     int M;
-    int N_pbc;
+    int N_pbc; //N + number of boundary points
     int i;
 
     FILE* file;
