@@ -30,12 +30,12 @@ int main(int argc, char *argv[]){
     sys.gamma_max = 1;
     sys.shear_start = 10;
 
-    sys.info_particles.n_log = -1;
-    sys.info_particles.n_start = -1;
-    sys.info_particles.include_boundary = 0;
+    sys.info_snapshot.n_log = -1;
+    sys.info_snapshot.n_start = -1;
+    sys.info_snapshot.include_boundary = 0;
 
-    sys.info_thermo.n_log = 100;
-    sys.info_thermo.n_start = 0;
+    sys.info_thermo.n_log = -1;
+    sys.info_thermo.n_start = -1;
 
     
     constantInit(argc, argv, &sys);
@@ -50,6 +50,10 @@ int main(int argc, char *argv[]){
     sys.velocities = velocities;
     sys.forces = forces;
     
+    jcv_point old_positions1[sys.N];
+    sys.old_info.old_positions_thermo = old_positions1;
+    jcv_point old_positions2[sys.N];
+    sys.old_info.old_positions_snapshot = old_positions2;
 
 
     //randomInitial(&sys);
@@ -67,7 +71,7 @@ int main(int argc, char *argv[]){
         
     }
 
-	fclose(sys.info_particles.file);
+	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
 }
@@ -176,14 +180,14 @@ void constantInit(int argc, char *argv[], data* sys){
     sys->shear_start /= sys->dt;
     sys->n_to_shear_max = round(sys->gamma_max/(sys->dt*sys->parameter.gamma_rate));
     sys->parameter.gamma_rate = sys->gamma_max/(sys->dt*sys->n_to_shear_max); //so that it's exactly gamma_max at the end
-    sys->parameter.gamma_rate *= -1; //because i'm reversing the shear at shear_start
+    sys->parameter.gamma_rate *= -1; //because I'm reversing the shear at shear_start in integrator.c
 
-    if (sys->info_particles.n_start == -1){
-        sys->info_particles.n_start = sys->shear_start;
+    if (sys->info_snapshot.n_start == -1){
+        sys->info_snapshot.n_start = sys->shear_start;
     }
 
-    if (sys->info_particles.n_log == -1){
-        sys->info_particles.n_log = 2*sys->n_to_shear_max;
+    if (sys->info_snapshot.n_log == -1){
+        sys->info_snapshot.n_log = 2*sys->n_to_shear_max; //need 2*n_to_shear_max to get the full cycle
     }
 
     if (sys->info_thermo.n_start == -1){
@@ -196,7 +200,7 @@ void constantInit(int argc, char *argv[], data* sys){
 
 	char filename[256];
 	sprintf(filename, "dump/N_%dPo_%fgamma_%f.dump", sys->N, sys->parameter.Po, sys->gamma_max);
-	sys->info_particles.file = fopen(filename, "w");
+	sys->info_snapshot.file = fopen(filename, "w");
 	sprintf(filename, "dump/N_%dPo_%fgamma_%f.thermo", sys->N, sys->parameter.Po, sys->gamma_max);
 	sys->info_thermo.file = fopen(filename, "w");
     fprintf(sys->info_thermo.file, "i E p shear gamma\n");

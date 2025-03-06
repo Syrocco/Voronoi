@@ -8,8 +8,8 @@
 typedef struct data_                 data;
 typedef struct parameter_            parameter;
 typedef struct logger_thermo_        logger_thermo;
-typedef struct logger_particles_     logger_particles;
-
+typedef struct logger_snapshot_      logger_snapshot;
+typedef struct memory_               memory;
 
 #define NOISE 0
 
@@ -19,12 +19,18 @@ struct logger_thermo_{
     FILE* file;
 };
 
-struct logger_particles_{
+struct logger_snapshot_{
     int n_log;
     int n_start;
 
     int include_boundary;
     FILE* file;
+};
+
+struct memory_{
+    jcv_point* old_positions_thermo;
+    jcv_point* old_positions_snapshot;
+    int new;
 };
 
 struct parameter_
@@ -59,10 +65,11 @@ struct data_
     int M;
     int N_pbc; //N + number of boundary points
     int i;
-
     
     logger_thermo info_thermo;
-    logger_particles info_particles;
+    logger_snapshot info_snapshot;
+
+    memory old_info;
 };
 
 

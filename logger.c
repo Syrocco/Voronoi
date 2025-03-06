@@ -4,8 +4,8 @@
 
 void loggers(data* sys){
     //only call saveTXT every sn_log steps beginning at n_start
-    if ((sys->i - sys->info_particles.n_start)%(sys->info_particles.n_log) == 0 
-         && sys->i >= sys->info_particles.n_start){
+    if ((sys->i - sys->info_snapshot.n_start)%(sys->info_snapshot.n_log) == 0 
+         && sys->i >= sys->info_snapshot.n_start){
         saveTXT(sys);
     }
 
@@ -13,6 +13,8 @@ void loggers(data* sys){
          && sys->i >= sys->info_thermo.n_start){
         computeThermo(sys);
     }
+
+    
 }
 
 void computeThermo(data* sys){
@@ -28,7 +30,7 @@ void computeThermo(data* sys){
 }
 
 void saveTXT(data* sys){
-    FILE* file = sys->info_particles.file;
+    FILE* file = sys->info_snapshot.file;
     jcv_real gamma = sys->gamma;
     jcv_real L = sys->L;    
     jcv_point* p = sys->positions;
@@ -37,23 +39,26 @@ void saveTXT(data* sys){
     int N = sys->N;
     int m = sys->i;
     int N_pbc = sys->N_pbc;
-    int NN = {sys->info_particles.include_boundary ? N_pbc : N};
+    int NN = {sys->info_snapshot.include_boundary ? N_pbc : N};
     jcv_real dL = gamma*L;
 
     jcv_real stress[N][2][2];
-
     for (int i = 0; i < N_pbc; i++){
         if (sys->sites[i].index >= N) continue;
         stress_unique(sys->sites + i, &sys->parameter, stress[sys->sites[i].index]);
     }
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy shear\n", m, NN, L + dL, dL, L);
+
+    jcv_real distance_move[N];
+    distance_moved(sys, sys->old_info.old_positions_snapshot ,distance_move);
+
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy shear dist\n", m, NN, L + dL, dL, L);
     for(int i = 0; i < NN; i++){
         if (i >= N){
-            fprintf(file, "%d %lf %lf nan nan nan nan nan\n", i, p[i].x, p[i].y);
+            fprintf(file, "%d %lf %lf nan nan nan nan nan nan\n", i, p[i].x, p[i].y);
             continue;
         }
         else{
-            fprintf(file, "%d %lf %lf %lf %lf %lf %lf %lf\n", i, p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y, (stress[i][0][1] + stress[i][1][0])/2);
+            fprintf(file, "%d %lf %lf %lf %lf %lf %lf %lf %lf\n", i, p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y, (stress[i][0][1] + stress[i][1][0])/2, distance_move[i]);
         }
     }
     fflush(file);

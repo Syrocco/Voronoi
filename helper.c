@@ -6,7 +6,6 @@
 /*
 Helper functions 
 */
-#define eps 0.000001
 
 inline jcv_point jcv_add(const jcv_point a, const jcv_point b){
     jcv_point c = {a.x + b.x, a.y + b.y};
@@ -135,6 +134,21 @@ void addBoundary(data* sys, int i){
     } 
 }
 
+//Not taking into account shear
+void pbc_distance(jcv_point* dr, jcv_real L){
+    if (dr->x > L/2){
+        dr->x -= L;
+    }
+    else if (dr->x < -L/2){
+        dr->x += L;
+    }
+    if (dr->y > L/2){
+        dr->y -= L;
+    }
+    else if (dr->y < -L/2){
+        dr->y += L;
+    }
+}
 //Box Muller gaussian number generator
 void gaussian(jcv_real* n1, jcv_real* n2){
     jcv_real u1 = drand(0, 1);

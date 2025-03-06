@@ -21,6 +21,7 @@ jcv_real jcv_lenght_sq(const jcv_point* a);
 
 void populate_points(jcv_point* points, int N, jcv_real L);
 void pbc(jcv_point* p, jcv_real L, jcv_real gamma);
+void pbc_distance(jcv_point* dr, jcv_real L);
 void addBoundary(data* sys, int i);
 
 double drand(double min, double max);

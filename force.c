@@ -259,3 +259,12 @@ void stress_total(data* sys, jcv_real stress[2][2]){
     }
 }
 
+void distance_moved(data* sys, jcv_point* old_positions, jcv_real* dist){
+    for (int i = 0; i < sys->N; i++){
+        jcv_point diff = jcv_sub(sys->positions[i], old_positions[i]);
+        pbc_distance(&diff, sys->L);
+        dist[i] = jcv_lenght(&diff);
+        
+        old_positions[i] = sys->positions[i];
+    }
+}
