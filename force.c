@@ -8,7 +8,7 @@ jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const
     jcv_real h72 = jcv_point_dist(h2, h7);
     jcv_real h23 = jcv_point_dist(h2, h3);
     if (jcv_real_eq(h72, 0) || jcv_real_eq(h23, 0)) { 
-        //return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
+        return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
     }
     jcv_point opp = {h3->y - h7->y, -h3->x + h7->x};
     jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
@@ -16,6 +16,7 @@ jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const
     jcv_point perimeter_last = jcv_add(jcv_mul(1/h72, jcv_sub(*h2, *h7)), jcv_mul(1/h23, jcv_sub(*h2, *h3)));
 
     jcv_point perimeter = jcv_mul(2*param->Kp*(P - param->Po), perimeter_last);
+    
     return jcv_add(area, perimeter);
 }
 
@@ -30,7 +31,14 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
     jcv_graphedge* next_edge = NULL;
 
     jcv_graphedge* runner = edgej;
-
+    /* printf("np.array([");
+    while (runner != NULL) {
+        printf("[%f, %f], ", runner->pos[0].x, runner->pos[0].y);
+        runner = runner->next;
+    }
+    printf("])\n"); */
+   
+    runner = edgej;
     while (runner != NULL) {
         if (runner->neighbor == si) {
             runner = runner->next;

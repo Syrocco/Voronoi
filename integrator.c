@@ -43,8 +43,8 @@ void eulerStep(data* sys){
     for (int i = 0; i < sys->N; i++){
         jcv_real r1, r2;
         gaussian(&r1, &r2);
-        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + JCV_SQRT(2*sys->T*sys->dt)*r1; 
-        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + JCV_SQRT(2*sys->T*sys->dt)*r2;
+        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + 0*JCV_SQRT(2*sys->T*sys->dt)*r1; 
+        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + 0*JCV_SQRT(2*sys->T*sys->dt)*r2;
         sys->positions[i].x = sys->positions[i].x + sys->gamma_rate*sys->dt*sys->positions[i].y;
         pbc(&sys->positions[i], sys->L, sys->amount_of_def);
         addBoundary(sys, i);

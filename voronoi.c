@@ -13,18 +13,19 @@
 #include <getopt.h>
 
 
+jcv_real energyUnique(data* sys, int num_particle);
 
 int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
     sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 3.9;
+    sys.parameter.Po = 4;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
-    sys.N = 400;
-    sys.M = 62000; 
-    sys.dt = 0.1;
+    sys.N = 1000;
+    sys.M = 10000; 
+    sys.dt = 0.01;
     sys.T = 0.;
     sys.gamma_rate = 0.0;
     
@@ -45,23 +46,99 @@ int main(int argc, char *argv[]){
     //randomInitial(&sys);
     
     rsaInitial(&sys, 0.4);
-    
 
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         
-        
-        //eulerStep(&sys);
-        fireStep(&sys);
+        eulerStep(&sys);
+        //fireStep(&sys);
 
-        
     }
 
+
+    jcv_real dx = 0.00000001;
+    jcv_real dy = 0.00000001;
+    jcv_graphedge* graph_edge = NULL;
+
+    for (int num_particle = 0; num_particle < sys.N; num_particle++){
+        printf("num_particle = %d\n", num_particle);
+        int count = 0;
+        int index[10];
+        jcv_point forceij[10];
+        jcv_real energy1ij[10];
+        jcv_real energy2ij[10];
+        jcv_real energy3ij[10];
+        jcv_point forceii;
+        jcv_real energy1ii;
+        jcv_real energy2ii;
+        jcv_real energy3ii;
+
+        jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, 0, sys.diagram);
+        sys.sites = jcv_diagram_get_sites(sys.diagram);
+
+        for (int i = 0; i < sys.N_pbc; i++){
+            if (sys.sites[i].index == num_particle){
+                forceii = get_edge_force_ii(sys.sites + i, &(sys.parameter)); //∂Ei/∂ri
+                graph_edge = sys.sites[i].edges;
+                while (graph_edge){
+                    index[count] = graph_edge->neighbor->index;
+                    forceij[count] = get_edge_force_ji(sys.sites + i, graph_edge, &(sys.parameter)); //∂Ei/∂rj
+                    count++;
+                    graph_edge = graph_edge->next;
+                }
+                break;
+            }
+        }
+        
+        for (int j = 0; j < count; j++){
+            energy1ij[j] =  energyUnique(&sys, index[j]);
+        }      
+        energy1ii = energyUnique(&sys, num_particle);
+
+        sys.positions[num_particle].x += dx;
+
+        jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, 0, sys.diagram);
+        sys.sites = jcv_diagram_get_sites(sys.diagram);
+        
+        for (int j = 0; j < count; j++){
+            energy2ij[j] =  energyUnique(&sys, index[j]);
+        }   
+        energy2ii = energyUnique(&sys, num_particle);
+
+        sys.positions[num_particle].x -= dx;
+        sys.positions[num_particle].y += dy;
+
+        jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, 0, sys.diagram);
+        sys.sites = jcv_diagram_get_sites(sys.diagram);
+        
+        for (int j = 0; j < count; j++){
+            energy3ij[j] =  energyUnique(&sys, index[j]);
+        }  
+        energy3ii = energyUnique(&sys, num_particle);
+
+        printf("dfii = (%f, %f)\n", forceii.x + (energy2ii - energy1ii)/dx, forceii.y + (energy3ii - energy1ii)/dx);
+        for (int j = 0; j < count; j++){
+            printf("dfij = (%f, %f)\n", forceij[j].x + (energy2ij[j] - energy1ij[j])/dx, forceij[j].y + (energy3ij[j] - energy1ij[j])/dx);
+        }
+
+        sys.positions[num_particle].y -= dy;
+    }
 	fclose(sys.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
 }
 
+jcv_real energyUnique(data* sys, int num_particle){
+    jcv_real energy1 = 0;
+    for (int i = 0; i < sys->N_pbc; i++){
+        if (sys->sites[i].index == num_particle){
+            energy1 += sys->parameter.Ka*(jcv_area(sys->sites + i) - sys->parameter.Ao)*(jcv_area(sys->sites + i) - sys->parameter.Ao);
+            energy1 += sys->parameter.Kp*(jcv_perimeter(sys->sites + i) - sys->parameter.Po)*(jcv_perimeter(sys->sites + i) - sys->parameter.Po);
+            return energy1;
+        }
+    }
+    return -1000;
+}
 
 void constantInit(int argc, char *argv[], data* sys){
 
