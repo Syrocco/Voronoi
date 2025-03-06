@@ -22,17 +22,27 @@ int main(int argc, char *argv[]){
     sys.parameter.Po = 3.9;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
-    sys.N = 400;
-    sys.M = 62000; 
+    sys.N = 2400;
+    sys.M = 120000; 
     sys.dt = 0.1;
-    sys.T = 0.;
-    sys.gamma_rate = 0.0;
+    sys.parameter.T = 0.0;
+    sys.parameter.gamma_rate = 0.1;
+    sys.gamma_max = 1;
+    sys.shear_start = 10;
+
+    sys.info_particles.n_log = -1;
+    sys.info_particles.n_start = -1;
+    sys.info_particles.include_boundary = 0;
+
+    sys.info_thermo.n_log = 100;
+    sys.info_thermo.n_start = 0;
+
     
     constantInit(argc, argv, &sys);
     
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
-    jcv_point positions[9*sys.N]; //9*sys.N == max N_pbc
+    jcv_point positions[3*sys.N]; //9*sys.N == max N_pbc
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
     sys.diagram = &diagram;
@@ -51,13 +61,13 @@ int main(int argc, char *argv[]){
         
         
         
-        //eulerStep(&sys);
-        fireStep(&sys);
+        eulerStep(&sys);
+        //fireStep(&sys);
 
         
     }
 
-	fclose(sys.file);
+	fclose(sys.info_particles.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
 }
@@ -76,13 +86,14 @@ void constantInit(int argc, char *argv[], data* sys){
         {"time", required_argument, NULL, 'M'},
         {"dL", required_argument, NULL, 'd'},
         {"temperature", required_argument, NULL, 'T'},
+        {"gamma_max", required_argument, NULL, 'g'},
         {NULL, 0, NULL, 0}
     };
     
 
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:T:", longopt, NULL)) != -1){
+    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:T:g:", longopt, NULL)) != -1){
         switch(c){
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
@@ -135,16 +146,23 @@ void constantInit(int argc, char *argv[], data* sys){
                 break;
             case 'T':
                 #if JCV_type == 0
-                    sscanf(optarg, "%f", &sys->T);
+                    sscanf(optarg, "%f", &(sys->parameter.T));
                 #else
-                    sscanf(optarg, "%lf", &sys->T);
+                    sscanf(optarg, "%lf", &(sys->parameter.T));
+                #endif
+                break;
+            case 'g':
+                #if JCV_type == 0
+                    sscanf(optarg, "%f", &(sys->gamma_max));
+                #else
+                    sscanf(optarg, "%lf", &(sys->gamma_max));
                 #endif
                 break;
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
     sys->i = 0;
-    sys->amount_of_def = 0;
+    sys->gamma = 0;
 
 	int info = system("mkdir -p dump");
 	if (info != 0) {
@@ -152,10 +170,35 @@ void constantInit(int argc, char *argv[], data* sys){
         return;
     }
     if (control_dL == 0){
-        sys->dL = fminf(5/sys->L, 1.0);
+        sys->dL = fminf(3/sys->L, 1.0);
     }
-	char filename[100];
-	sprintf(filename, "dump/N_%dPo_%f.dump", sys->N, sys->parameter.Po);
-	sys->file = fopen(filename, "w");
+
+    sys->shear_start /= sys->dt;
+    sys->n_to_shear_max = round(sys->gamma_max/(sys->dt*sys->parameter.gamma_rate));
+    sys->parameter.gamma_rate = sys->gamma_max/(sys->dt*sys->n_to_shear_max); //so that it's exactly gamma_max at the end
+    sys->parameter.gamma_rate *= -1; //because i'm reversing the shear at shear_start
+
+    if (sys->info_particles.n_start == -1){
+        sys->info_particles.n_start = sys->shear_start;
+    }
+
+    if (sys->info_particles.n_log == -1){
+        sys->info_particles.n_log = 2*sys->n_to_shear_max;
+    }
+
+    if (sys->info_thermo.n_start == -1){
+        sys->info_thermo.n_start = sys->shear_start;
+    }
+
+    if (sys->info_thermo.n_log == -1){
+        sys->info_thermo.n_log = 2*sys->n_to_shear_max;
+    }
+
+	char filename[256];
+	sprintf(filename, "dump/N_%dPo_%fgamma_%f.dump", sys->N, sys->parameter.Po, sys->gamma_max);
+	sys->info_particles.file = fopen(filename, "w");
+	sprintf(filename, "dump/N_%dPo_%fgamma_%f.thermo", sys->N, sys->parameter.Po, sys->gamma_max);
+	sys->info_thermo.file = fopen(filename, "w");
+    fprintf(sys->info_thermo.file, "i E p shear gamma\n");
 }
 

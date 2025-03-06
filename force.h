@@ -10,10 +10,17 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
 jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param);
 
 
-void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_real jacobian[2][2]);
+void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_point jacobian[2]);
 
 void compute_force(data* sys);
 
-jcv_real energy(const jcv_site* sites, const int N, const int N_pbc, const parameter* param);
+void shear(data* sys);
+
+jcv_real energy_total(const jcv_site* sites, const int N, const int N_pbc, const parameter* param);
+jcv_real energy_unique(const jcv_site* site, const parameter* param);
+
+void stress_total(data* sys, jcv_real stress[2][2]);
+void stress_unique(const jcv_site* site, const parameter* param, jcv_real stress[2][2]);
+
 
 #endif

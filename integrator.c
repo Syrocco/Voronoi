@@ -3,6 +3,7 @@
 #include "helper.h"
 #include "force.h"
 #include "voronoi.h"
+#include "logger.h"
 #include <time.h>
 
 
@@ -20,40 +21,45 @@
 
 void eulerStep(data* sys){
 
-    if ((sys->i + 1)%100 == 0){
-        sys->gamma_rate *= -1;
-    }
-    sys->amount_of_def += sys->dt*sys->gamma_rate;
-    
 
-    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
+    //TIME_FUNCTION(jcv_diagram_generate,sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     
-    if ((sys->i + 1)%100 == 0){
-        printf("m = %d, E = %f \n", sys->i, energy(sys->sites, sys->N, sys->N_pbc, &sys->parameter));
-        saveTXT(sys);
+
+
+    loggers(sys);
+
         
-    }
-            
+    shear(sys);
+
+    //TIME_FUNCTION(compute_force, sys);
     compute_force(sys);
 
     sys->N_pbc = sys->N;
     jcv_real forcex = 0;
     jcv_real forcey = 0;
     for (int i = 0; i < sys->N; i++){
+        #if NOISE 
         jcv_real r1, r2;
         gaussian(&r1, &r2);
-        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + JCV_SQRT(2*sys->T*sys->dt)*r1; 
-        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + JCV_SQRT(2*sys->T*sys->dt)*r2;
-        sys->positions[i].x = sys->positions[i].x + sys->gamma_rate*sys->dt*sys->positions[i].y;
-        pbc(&sys->positions[i], sys->L, sys->amount_of_def);
+        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x + JCV_SQRT(2*sys->parameter.T*sys->dt)*r1; 
+        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y + JCV_SQRT(2*sys->parameter.T*sys->dt)*r2;
+        #else
+        sys->positions[i].x = sys->positions[i].x + sys->dt*sys->forces[i].x; 
+        sys->positions[i].y = sys->positions[i].y + sys->dt*sys->forces[i].y;
+        #endif
+        if (sys->i - sys->shear_start >= 0){
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+        }
+        pbc(&sys->positions[i], sys->L, sys->gamma);
         addBoundary(sys, i);
         forcex += sys->forces[i].x;
         forcey += sys->forces[i].y;
     }
     
-    if ((forcex*forcex + forcey*forcey) > 0.00001){
-        printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
+    if ((forcex*forcex + forcey*forcey)/sys->N > 0.00001){
+        //printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
         //exit(3);
     }
 
@@ -61,9 +67,9 @@ void eulerStep(data* sys){
 
 void fireStep(data* sys){
     if ((sys->i + 1)%100 == 0){
-        sys->gamma_rate *= -1;
+        sys->parameter.gamma_rate *= -1;
     }
-    sys->amount_of_def += sys->dt*sys->gamma_rate;
+    sys->gamma += sys->dt*sys->parameter.gamma_rate;
     jcv_real P = 0.0;
     jcv_real fnorm = 0.0;
     jcv_real vnorm = 0.0;
@@ -134,7 +140,7 @@ void fireStep(data* sys){
             //sys->positions[i].x += sys->gamma_rate*sys->dt*sys->positions[i].y;
             
             // Apply boundary conditions
-            pbc(&sys->positions[i], sys->L, sys->amount_of_def);
+            pbc(&sys->positions[i], sys->L, sys->gamma);
             addBoundary(sys, i);
         }
         saveTXT(sys);

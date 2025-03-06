@@ -3,13 +3,15 @@
 #include "jc_voronoi.h"
 #include <stdio.h>
 #include "voronoi.h"
+#include <omp.h>
 
 jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
     jcv_real h72 = jcv_point_dist(h2, h7);
     jcv_real h23 = jcv_point_dist(h2, h3);
     if (jcv_real_eq(h72, 0) || jcv_real_eq(h23, 0)) { 
-        //return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
-    }
+        printf("reset force due to vertice proximity\n");
+        return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
+    } 
     jcv_point opp = {h3->y - h7->y, -h3->x + h7->x};
     jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
 
@@ -69,23 +71,21 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
     const jcv_point* rl = &(prev_edge->neighbor->p);
     const jcv_point* rk = &(next_edge->neighbor->p);
 
-    const jcv_real Aj = jcv_area(sj);
-    const jcv_real Pj = jcv_perimeter(sj);
+    const jcv_real A = jcv_area(sj);
+    const jcv_real P = jcv_perimeter(sj);
 
-    jcv_point dEj_dh2 = force_h(Aj, Pj, h7, h2, h3, param);
-    jcv_point dEj_dh3 = force_h(Aj, Pj, h2, h3, h8, param);
+    jcv_point dEj_dh2 = force_h(A, P, h7, h2, h3, param);
+    jcv_point dEj_dh3 = force_h(A, P, h2, h3, h8, param);
     
-    jcv_real jacobian_h2[2][2] = {{0, 0}, {0, 0}};
-    jcv_real jacobian_h3[2][2] = {{0, 0}, {0, 0}};
+    jcv_point jacobian_h2[2];
+    jcv_point jacobian_h3[2];
 
     derivative(ri, rl, rj, jacobian_h2);
     derivative(ri, rj, rk, jacobian_h3);
 
-    jcv_real dEj_drix = (dEj_dh2.x*jacobian_h2[0][0] + dEj_dh2.y*jacobian_h2[0][1]
-                        + dEj_dh3.x*jacobian_h3[0][0] + dEj_dh3.y*jacobian_h3[0][1]);
+    jcv_real dEj_drix = jcv_dot(dEj_dh2, jacobian_h2[0]) + jcv_dot(dEj_dh3, jacobian_h3[0]);
+    jcv_real dEj_driy = jcv_dot(dEj_dh2, jacobian_h2[1]) + jcv_dot(dEj_dh3, jacobian_h3[1]);
     
-    jcv_real dEj_driy = (dEj_dh2.x*jacobian_h2[1][0] + dEj_dh2.y*jacobian_h2[1][1]
-                        + dEj_dh3.x*jacobian_h3[1][0] + dEj_dh3.y*jacobian_h3[1][1]);
 
     return (jcv_point){-dEj_drix, -dEj_driy};
 
@@ -101,12 +101,13 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     jcv_graphedge* edge_after = edge->next;
 
 
+    const jcv_real A = jcv_area(si);
+    const jcv_real P = jcv_perimeter(si);
+
     jcv_real dE_drx = 0;
     jcv_real dE_dry = 0;
-    jcv_real jacobian[2][2] = {{0, 0}, {0, 0}};
+    jcv_point jacobian[2];
 
-    jcv_real A = jcv_area(si);
-    jcv_real P = jcv_perimeter(si);
     while (edge_after != NULL){
 
         rj = &(edge->neighbor->p);
@@ -114,8 +115,9 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
         derivative(ri, rj, rk, jacobian);
 
         jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
-        dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
-        dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
+
+        dE_drx += jcv_dot(dE_dh, jacobian[0]);
+        dE_dry += jcv_dot(dE_dh, jacobian[1]);
 
         edge = edge_after;
         edge_after = edge_after->next;
@@ -124,15 +126,13 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
     //Last triangle in Delaunay made of last edge and first edge
     derivative(ri, rk, &(si->edges->neighbor->p), jacobian);
     jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
-    dE_drx += dE_dh.x*jacobian[0][0] + dE_dh.y*jacobian[0][1];
-    dE_dry += dE_dh.x*jacobian[1][0] + dE_dh.y*jacobian[1][1];
-    //printf("ri = (%f, %f), rj = (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rk->x, rk->y, si->edges->neighbor->p.x, si->edges->neighbor->p.y);
-    
-
+    dE_drx += jcv_dot(dE_dh, jacobian[0]);
+    dE_dry += jcv_dot(dE_dh, jacobian[1]);
+   
     return (jcv_point){-dE_drx, -dE_dry};
 
 }
-void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_real jacobian[2][2]){
+void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, jcv_point jacobian[2]){
     jcv_point rij = jcv_sub(*ri, *rj);
     jcv_point rik = jcv_sub(*ri, *rk);
     jcv_point rjk = jcv_sub(*rj, *rk);
@@ -146,9 +146,10 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jcv_real D = 2*rij_cross_rjk*rij_cross_rjk;
 
     if (D == 0){
-       printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
+        printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
         exit(3);
     }
+
     jcv_real alpha = rjk_sq*jcv_dot(rij, rik)/D;
     jcv_real beta = rik_sq*jcv_dot(rji, rjk)/D;
     jcv_real gamma = rij_sq*jcv_dot(rki, rkj)/D;
@@ -162,24 +163,20 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     
 
     // h = alpha*ri + beta*rj + gamma*rk
-    // first index = derivative, second index = h
+    // first index = derivative, .x or .y => h.x or h.y
     // ∂h.x/∂ri.x
-    jacobian[0][0] = alpha + dalphadri.x*ri->x + dbetadri.x*rj->x + dgammadri.x*rk->x;
+    jacobian[0].x = alpha + dalphadri.x*ri->x + dbetadri.x*rj->x + dgammadri.x*rk->x;
     // ∂h.y/∂ri.x  
-    jacobian[0][1] = dalphadri.x*ri->y + dbetadri.x*rj->y + dgammadri.x*rk->y;
+    jacobian[0].y = dalphadri.x*ri->y + dbetadri.x*rj->y + dgammadri.x*rk->y;
     // ∂h.x/∂ri.y 
-    jacobian[1][0] = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
+    jacobian[1].x = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
     // ∂h.y/∂ri.y 
-    jacobian[1][1] = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
+    jacobian[1].y = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
 
-    //jcv_real x, y;
-    //x = alpha*ri->x + beta*rj->x + gamma*rk->x;
-    //y = alpha*ri->y + beta*rj->y + gamma*rk->y;
-    //printf("h = (%f, %f)\n", x, y);
 }
 
 void compute_force(data* sys){
-
+    #pragma omp parallel for schedule(dynamic) proc_bind(close)
     for (int i = 0; i < sys->N_pbc; i++){
         if (sys->sites[i].index >= sys->N) continue;
         sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter); //∂Ei/∂ri
@@ -193,13 +190,72 @@ void compute_force(data* sys){
     }
 }
 
-jcv_real energy(const jcv_site* sites, const int N, const int N_pbc, const parameter* param){
+void shear(data* sys){
+    int normalized_time = sys->i - sys->shear_start;
+    if (normalized_time >= 0){
+        if (normalized_time%sys->n_to_shear_max == 0){
+            sys->parameter.gamma_rate *= -1;
+        }
+        sys->gamma += sys->dt*sys->parameter.gamma_rate;
+    }
+}
+
+inline jcv_real energy_unique(const jcv_site* site, const parameter* param){
+    return param->Ka*(jcv_area(site) - param->Ao)*(jcv_area(site) - param->Ao)
+           + param->Kp*(jcv_perimeter(site) - param->Po)*(jcv_perimeter(site) - param->Po);
+}
+
+jcv_real energy_total(const jcv_site* sites, const int N, const int N_pbc, const parameter* param){
     jcv_real E = 0;
     for (int i = 0; i < N_pbc; i++){
         if (sites[i].index >= N) continue;
-        E += param->Ka*(jcv_area(sites + i) - param->Ao)*(jcv_area(sites + i) - param->Ao);
-        E += param->Kp*(jcv_perimeter(sites + i) - param->Po)*(jcv_perimeter(sites + i) - param->Po);
+        E += energy_unique(sites + i, param);
     }
     return E;
+}
+
+// https://pmc.ncbi.nlm.nih.gov/articles/PMC11398538/pdf/nihpp-2409.04383v1.pdf
+// https://www.pnas.org/doi/pdf/10.1073/pnas.1705921114
+inline void stress_unique(const jcv_site* site, const parameter* param, jcv_real stress[2][2]){
+    
+    stress[0][1] = 0;
+    stress[1][0] = 0;
+
+    jcv_real Ai = jcv_area(site);
+    jcv_real Pi = jcv_perimeter(site);
+    jcv_real pressure = param->Ka*(Ai - param->Ao);
+    jcv_graphedge* edge = site->edges;
+    
+    stress[0][0] = pressure;
+    stress[1][1] = pressure;
+
+    jcv_real prefac = 1/(2*Ai); // 2 because each edge is counted twice
+    while (edge){
+        jcv_point l_ij = jcv_sub(edge->pos[1], edge->pos[0]);
+        jcv_point l_ij_normalized = jcv_mul(1/jcv_lenght(&l_ij), l_ij);
+        jcv_real Pj = jcv_perimeter(edge->neighbor);
+        jcv_point tension = jcv_mul(2*param->Kp*((Pj - param->Po) + (Pi - param->Po)), l_ij_normalized);
+        edge = edge->next;
+        stress[0][0] += prefac*tension.x*l_ij.x;
+        stress[0][1] += prefac*tension.x*l_ij.y;
+        stress[1][0] += prefac*tension.y*l_ij.x;    
+        stress[1][1] += prefac*tension.y*l_ij.y;
+    }
+}
+
+void stress_total(data* sys, jcv_real stress[2][2]){
+    stress[0][0] = 0;
+    stress[0][1] = 0;
+    stress[1][0] = 0;
+    stress[1][1] = 0;
+    jcv_real temp_stress[2][2];
+    for (int i = 0; i < sys->N_pbc; i++){
+        if (sys->sites[i].index >= sys->N) continue;
+        stress_unique(sys->sites + i, &sys->parameter, temp_stress);
+        stress[0][0] += temp_stress[0][0];
+        stress[0][1] += temp_stress[0][1];
+        stress[1][0] += temp_stress[1][0];
+        stress[1][1] += temp_stress[1][1];
+    }
 }
 

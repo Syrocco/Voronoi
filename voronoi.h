@@ -5,8 +5,27 @@
 #include <getopt.h>
 #include <stdio.h>
 
-typedef struct data_           data;
-typedef struct parameter_      parameter;
+typedef struct data_                 data;
+typedef struct parameter_            parameter;
+typedef struct logger_thermo_        logger_thermo;
+typedef struct logger_particles_     logger_particles;
+
+
+#define NOISE 0
+
+struct logger_thermo_{
+    int n_log;
+    int n_start;
+    FILE* file;
+};
+
+struct logger_particles_{
+    int n_log;
+    int n_start;
+
+    int include_boundary;
+    FILE* file;
+};
 
 struct parameter_
 {
@@ -14,6 +33,9 @@ struct parameter_
     jcv_real Po;
     jcv_real Ka;
     jcv_real Kp;
+    jcv_real T;
+    jcv_real gamma_rate;
+    
 };
 
 struct data_
@@ -23,19 +45,24 @@ struct data_
     jcv_point* velocities;
     jcv_point* forces;
     const jcv_site* sites;
-
+    
     jcv_real L, dL; //dL = fraction of L to include at the boundaries for pbc
-    jcv_real gamma_rate;
-    jcv_real amount_of_def;
+    
+    jcv_real gamma;
+    jcv_real gamma_max;
+    int shear_start;
+    int n_to_shear_max;
+
     jcv_real dt;
     parameter parameter;
-    jcv_real T;
     int N;
     int M;
     int N_pbc; //N + number of boundary points
     int i;
 
-    FILE* file;
+    
+    logger_thermo info_thermo;
+    logger_particles info_particles;
 };
 
 

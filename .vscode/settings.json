@@ -15,6 +15,7 @@
         "integrator.h": "c",
         "initial.h": "c",
         "climits": "cpp",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "logger.h": "c"
     }
 }

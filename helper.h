@@ -19,11 +19,8 @@ jcv_real jcv_lenght(const jcv_point* a);
 jcv_real jcv_lenght_sq(const jcv_point* a);
 
 
-void saveTXT(data* sys);
-void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N, int N_pbc);
-
 void populate_points(jcv_point* points, int N, jcv_real L);
-void pbc(jcv_point* p, jcv_real L, jcv_real amount_of_def);
+void pbc(jcv_point* p, jcv_real L, jcv_real gamma);
 void addBoundary(data* sys, int i);
 
 double drand(double min, double max);

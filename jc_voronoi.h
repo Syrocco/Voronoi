@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 
-#define JCV_type 1
+#define JCV_type 0
 
 #if JCV_type == 1
     #define JCV_REAL_TYPE double
