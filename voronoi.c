@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
 
-    sys.size_large_over_small = 4./3.;
+    sys.size_large_over_small = 4.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;

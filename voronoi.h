@@ -75,8 +75,8 @@ struct data_
     int N_pbc; //N + number of boundary points
     int i;
 
-    int n_frac_small;
-    int size_large_over_small;
+    jcv_real n_frac_small;
+    jcv_real size_large_over_small;
     
     logger_thermo info_thermo;
     logger_snapshot info_snapshot;
