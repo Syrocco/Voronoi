@@ -43,8 +43,7 @@ struct memory_{
 
 struct parameter_
 {
-    jcv_real Ao;
-    jcv_real Po;
+    jcv_real qo;
     jcv_real Ka;
     jcv_real Kp;
     jcv_real T;
@@ -58,6 +57,8 @@ struct data_
     jcv_point* positions;
     jcv_point* velocities;
     jcv_point* forces;
+    jcv_real* prefered_area;
+
     const jcv_site* sites;
     
     jcv_real L, dL; //dL = fraction of L to include at the boundaries for pbc
@@ -73,6 +74,9 @@ struct data_
     int M;
     int N_pbc; //N + number of boundary points
     int i;
+
+    int n_frac_small;
+    int size_large_over_small;
     
     logger_thermo info_thermo;
     logger_snapshot info_snapshot;

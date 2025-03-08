@@ -22,7 +22,7 @@ void computeThermo(data* sys){
     
     
 
-    jcv_real E = energy_total(sys->sites, sys->N, sys->N_pbc, &sys->parameter);
+    jcv_real E = energy_total(sys);
     fprintf(sys->info_thermo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
     printf("i = %d, E = %lf, γ = %lf ", sys->i, E, sys->gamma);
 
@@ -83,7 +83,7 @@ void saveTXT(data* sys){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){
             if (sys->sites[i].index >= N) continue;
-            stress_unique(sys->sites + i, &sys->parameter, stress[sys->sites[i].index]);
+            stress_unique(sys, i, stress[sys->sites[i].index]);
         }
     }
     if (sys->info_snapshot.compute_dist_travelled){

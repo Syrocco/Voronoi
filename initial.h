@@ -4,5 +4,6 @@
 
 void randomInitial(data* sys);
 void rsaInitial(data* sys, jcv_real min_distance);
+void distribute_area(data* sys);
 
 #endif

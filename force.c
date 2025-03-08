@@ -3,9 +3,9 @@
 #include "jc_voronoi.h"
 #include <stdio.h>
 #include "voronoi.h"
-#include <omp.h>
 
-jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
+jcv_point force_h(const jcv_real A, const jcv_real Aj, const jcv_real P, const jcv_real Pj, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
+    
     jcv_real h72 = jcv_point_dist(h2, h7);
     jcv_real h23 = jcv_point_dist(h2, h3);
     if (jcv_real_eq(h72, 0) || jcv_real_eq(h23, 0)) { 
@@ -13,15 +13,15 @@ jcv_point force_h(const jcv_real A, const jcv_real P, const jcv_point* h7, const
         return (jcv_point){0, 0}; //Hacky, can be exactly 0 due to floating point stupidity
     } 
     jcv_point opp = {h3->y - h7->y, -h3->x + h7->x};
-    jcv_point area = jcv_mul(param->Ka*(A - param->Ao), opp);
+    jcv_point area = jcv_mul(param->Ka*(A - Aj), opp);
 
     jcv_point perimeter_last = jcv_add(jcv_mul(1/h72, jcv_sub(*h2, *h7)), jcv_mul(1/h23, jcv_sub(*h2, *h3)));
 
-    jcv_point perimeter = jcv_mul(2*param->Kp*(P - param->Po), perimeter_last);
+    jcv_point perimeter = jcv_mul(2*param->Kp*(P - Pj), perimeter_last);
     return jcv_add(area, perimeter);
 }
 
-jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, const parameter* param){
+jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, const jcv_real Aj, const parameter* param){
 
     //edgei is owned by site i: si
 
@@ -74,8 +74,8 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
     const jcv_real A = jcv_area(sj);
     const jcv_real P = jcv_perimeter(sj);
 
-    jcv_point dEj_dh2 = force_h(A, P, h7, h2, h3, param);
-    jcv_point dEj_dh3 = force_h(A, P, h2, h3, h8, param);
+    jcv_point dEj_dh2 = force_h(A, Aj, P, param->qo*JCV_SQRT(Aj), h7, h2, h3, param);
+    jcv_point dEj_dh3 = force_h(A, Aj, P, param->qo*JCV_SQRT(Aj), h2, h3, h8, param);
     
     jcv_point jacobian_h2[2];
     jcv_point jacobian_h3[2];
@@ -91,7 +91,7 @@ jcv_point get_edge_force_ji(const jcv_site* si, const jcv_graphedge* edgei, cons
 
 }
 
-jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
+jcv_point get_edge_force_ii(const jcv_site* si, const jcv_real Ai, const parameter* param){
     
     const jcv_point* ri = &(si->p);
     jcv_point* rj = NULL;
@@ -114,7 +114,7 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
         rk = &(edge_after->neighbor->p);
         derivative(ri, rj, rk, jacobian);
 
-        jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
+        jcv_point dE_dh = force_h(A, Ai, P, param->qo*JCV_SQRT(Ai), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
 
         dE_drx += jcv_dot(dE_dh, jacobian[0]);
         dE_dry += jcv_dot(dE_dh, jacobian[1]);
@@ -125,7 +125,7 @@ jcv_point get_edge_force_ii(const jcv_site* si, const parameter* param){
 
     //Last triangle in Delaunay made of last edge and first edge
     derivative(ri, rk, &(si->edges->neighbor->p), jacobian);
-    jcv_point dE_dh = force_h(A, P, &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
+    jcv_point dE_dh = force_h(A, Ai, P, param->qo*JCV_SQRT(Ai), &(edge->pos[0]), &(edge->pos[1]), &(si->edges->pos[1]), param);
     dE_drx += jcv_dot(dE_dh, jacobian[0]);
     dE_dry += jcv_dot(dE_dh, jacobian[1]);
    
@@ -178,13 +178,14 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
 void compute_force(data* sys){
     #pragma omp parallel for schedule(dynamic) proc_bind(close)
     for (int i = 0; i < sys->N_pbc; i++){
-        if (sys->sites[i].index >= sys->N) continue;
-        sys->forces[sys->sites[i].index] = get_edge_force_ii(sys->sites + i, &sys->parameter); //∂Ei/∂ri
+        int index = sys->sites[i].index;
+        if (index >= sys->N) continue;
+        sys->forces[index] = get_edge_force_ii(sys->sites + i, sys->prefered_area[index], &sys->parameter); //∂Ei/∂ri
         jcv_graphedge* graph_edge = sys->sites[i].edges;
         while (graph_edge){ //looping over neighbors: graph_edge is in common between i and j
-            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, &sys->parameter); //∂Ej/∂ri
-            sys->forces[sys->sites[i].index].x += force_ji.x;                                   
-            sys->forces[sys->sites[i].index].y += force_ji.y;
+            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, sys->prefered_area[graph_edge->neighbor->index], &sys->parameter); //∂Ej/∂ri
+            sys->forces[index].x += force_ji.x;                                   
+            sys->forces[index].y += force_ji.y;
             graph_edge = graph_edge->next;
         }
     }

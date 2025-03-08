@@ -6,7 +6,7 @@
 #include "logger.h"
 #include "thermo.h"
 #include <time.h>
-
+#include <omp.h>
 
 #define TIME_FUNCTION(func, ...) \
     do { \

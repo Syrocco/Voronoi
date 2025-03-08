@@ -18,19 +18,22 @@ int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
-    sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 3.5;
+    sys.parameter.qo = 3.75;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
+
+    sys.size_large_over_small = 4./3.;
+    sys.n_frac_small = 0.5;
+
     sys.N = 300;
-    sys.M = 1000; 
-    sys.dt = 0.05;
+    sys.M = 10000; 
+    sys.dt = 0.1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.1;
+    sys.parameter.gamma_rate = 0;
     sys.gamma_max = 1;
     sys.shear_start = 0;
 
-    sys.info_snapshot.n_log = 10;
+    sys.info_snapshot.n_log = 100;
     sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 0;
@@ -50,10 +53,12 @@ int main(int argc, char *argv[]){
     jcv_point positions[3*sys.N]; //9*sys.N == max N_pbc
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
+    jcv_real prefered_area[3*sys.N];
     sys.diagram = &diagram;
     sys.positions = positions;
     sys.velocities = velocities;
     sys.forces = forces;
+    sys.prefered_area = prefered_area;
     
     jcv_point old_positions1[sys.N];
     sys.old_info.old_positions_thermo = old_positions1;
@@ -62,7 +67,7 @@ int main(int argc, char *argv[]){
 
 
     //randomInitial(&sys);
-    
+    distribute_area(&sys);
     rsaInitial(&sys, 0.4);
     
 
@@ -102,23 +107,16 @@ void constantInit(int argc, char *argv[], data* sys){
 
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:p:a:k:P:D:m:d:T:g:", longopt, NULL)) != -1){
+    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:", longopt, NULL)) != -1){
         switch(c){
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
                 break;
-            case 'p':
+            case 'q':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->parameter.Po);
                 #else
-                    sscanf(optarg, "%lf", &sys->parameter.Po);
-                #endif
-                break;
-            case 'a':
-                #if JCV_type == 0
-                    sscanf(optarg, "%f", &sys->parameter.Ao);    
-                #else
-                    sscanf(optarg, "%lf", &sys->parameter.Ao);
+                    sscanf(optarg, "%lf", &sys->parameter.qo);
                 #endif
                 break;
             case 'k':
@@ -208,9 +206,9 @@ void constantInit(int argc, char *argv[], data* sys){
     }
 
 	char filename[256];
-	sprintf(filename, "dump/N_%dPo_%fgamma_%f.dump", sys->N, sys->parameter.Po, sys->gamma_max);
+	sprintf(filename, "dump/N_%dqo_%fgamma_%f.dump", sys->N, sys->parameter.qo, sys->gamma_max);
 	sys->info_snapshot.file = fopen(filename, "w");
-	sprintf(filename, "dump/N_%dPo_%fgamma_%f.thermo", sys->N, sys->parameter.Po, sys->gamma_max);
+	sprintf(filename, "dump/N_%dqo_%fgamma_%f.thermo", sys->N, sys->parameter.qo, sys->gamma_max);
 	sys->info_thermo.file = fopen(filename, "w");
     fprintf(sys->info_thermo.file, "i E gamma_actual ");
     if (sys->info_thermo.compute_stress){

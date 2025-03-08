@@ -43,3 +43,10 @@ void rsaInitial(data* sys, jcv_real min_distance) {
         }
     }
 }
+
+void distribute_area(data* sys){
+    for (int i = 0; i < sys->N; i++){
+        jcv_real fac = (((jcv_real) i)/sys->N ? 1 : sys->size_large_over_small);
+        sys->prefered_area[i] = fac/(sys->n_frac_small + sys->size_large_over_small - sys->n_frac_small*sys->size_large_over_small);
+    }
+}

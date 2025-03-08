@@ -120,16 +120,19 @@ void addBoundary(data* sys, int i){
     if (left || right) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
         sys->N_pbc++;
     } 
     if (bottom || top) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + gamma*(bottom ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
         sys->N_pbc++;
     } 
     if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + gamma*(bottom ? L : -L) + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
         sys->N_pbc++;
     } 
 }
