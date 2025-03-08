@@ -4,6 +4,7 @@
 #include "force.h"
 #include "voronoi.h"
 #include "logger.h"
+#include "thermo.h"
 #include <time.h>
 
 
@@ -73,15 +74,21 @@ void fireStep(data* sys){
     jcv_real P = 0.0;
     jcv_real fnorm = 0.0;
     jcv_real vnorm = 0.0;
-    int n_pos = 0;
+    
+    
+    const jcv_real alpha_start = 0.3;
    
-    const jcv_real alpha_start = 0.1;
-    jcv_real alpha_now = alpha_start;
     const jcv_real f_inc = 1.1;
     const jcv_real f_dec = 0.5;
     const jcv_real f_alpha = 0.99;
-    const int N_min = 5;
+    const int n_delay = 5;
+    
+    const jcv_real dt_max = sys->dt;
+    const jcv_real dt_min = sys->dt/100;
+
+    int n_pos = 0;
     jcv_real dt_now = sys->dt;
+    jcv_real alpha_now = alpha_start;
 
     for (int i = 0; i < sys->N; i++){
         sys->velocities[i].x = 0;
@@ -99,14 +106,18 @@ void fireStep(data* sys){
         vnorm = 0;
 
         for (int i = 0; i < sys->N; i++) {
+            sys->velocities[i].x += dt_now*sys->forces[i].x;
+            sys->velocities[i].y += dt_now*sys->forces[i].y;
             P += sys->forces[i].x*sys->velocities[i].x + sys->forces[i].y*sys->velocities[i].y;
             fnorm += sys->forces[i].x*sys->forces[i].x + sys->forces[i].y*sys->forces[i].y;
             vnorm += sys->velocities[i].x*sys->velocities[i].x + sys->velocities[i].y*sys->velocities[i].y;
         }
 
         fnorm = JCV_SQRT(fnorm);
-        printf("fnorm = %f, dt_now = %f, P = %f, alpha_now = %f \n", fnorm, dt_now, P, alpha_now);
         vnorm = JCV_SQRT(vnorm);
+
+        printf("fnorm = %.10lf, dt_now = %f, P = %.10lf, alpha_now = %f \n", fnorm/sys->L, dt_now, P, alpha_now);
+
 
         if (P > 0){
             n_pos++;
@@ -114,14 +125,14 @@ void fireStep(data* sys){
                 sys->velocities[i].x = (1.0 - alpha_now)*sys->velocities[i].x + alpha_now*sys->forces[i].x*(vnorm/fnorm);
                 sys->velocities[i].y = (1.0 - alpha_now)*sys->velocities[i].y + alpha_now*sys->forces[i].y*(vnorm/fnorm);
             }
-            if (n_pos > N_min) {
-                dt_now = dt_now*f_inc;
+            if (n_pos > n_delay) {
+                dt_now = jcv_min(dt_now*f_inc, dt_max);
                 alpha_now *= f_alpha;
             }
         } 
         else{
             n_pos = 0;
-            dt_now = dt_now*f_dec;
+            dt_now = jcv_max(dt_now*f_dec, dt_min);
             alpha_now = alpha_start;
             
             // Zero the velocities
@@ -132,20 +143,18 @@ void fireStep(data* sys){
         }
         sys->N_pbc = sys->N;
         for (int i = 0; i < sys->N; i++) {
-            // Update positions
-            sys->velocities[i].x += dt_now*sys->forces[i].x;
-            sys->velocities[i].y += dt_now*sys->forces[i].y;
             sys->positions[i].x += dt_now*sys->velocities[i].x;
             sys->positions[i].y += dt_now*sys->velocities[i].y;
-            //sys->positions[i].x += sys->gamma_rate*sys->dt*sys->positions[i].y;
-            
-            // Apply boundary conditions
             pbc(&sys->positions[i], sys->L, sys->gamma);
             addBoundary(sys, i);
         }
-        saveTXT(sys);
-
-    } while (fnorm/sys->L > 1e-4); // L = sqrt((float)N)
-    
+        
+        loggers(sys);
+        if (fnorm/sys->L < 1e-9){
+            printf("%lf \n", (fnorm/sys->L)/1e-10);
+        }
+    } while (fnorm/sys->L > 1e-10); // L = sqrt((float)N)
+   
+    exit(3);
 }
 

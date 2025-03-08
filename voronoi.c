@@ -19,24 +19,29 @@ int main(int argc, char *argv[]){
 
     data sys;
     sys.parameter.Ao = 1.0;
-    sys.parameter.Po = 3.9;
+    sys.parameter.Po = 3.5;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
-    sys.N = 2400;
-    sys.M = 120000; 
-    sys.dt = 0.1;
+    sys.N = 300;
+    sys.M = 1000; 
+    sys.dt = 0.05;
     sys.parameter.T = 0.0;
     sys.parameter.gamma_rate = 0.1;
     sys.gamma_max = 1;
-    sys.shear_start = 10;
+    sys.shear_start = 0;
 
-    sys.info_snapshot.n_log = -1;
-    sys.info_snapshot.n_start = -1;
+    sys.info_snapshot.n_log = 10;
+    sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
+    sys.info_snapshot.compute_stress = 0;
+    sys.info_snapshot.compute_dist_travelled = 0;
+    sys.info_snapshot.compute_area = 1;
+    sys.info_snapshot.compute_perimeter = 1;
 
-    sys.info_thermo.n_log = -1;
-    sys.info_thermo.n_start = -1;
-
+    sys.info_thermo.n_log = 100;
+    sys.info_thermo.n_start = 0;
+    sys.info_thermo.compute_stress = 1;
+    sys.info_thermo.compute_dist_travelled = 1;
     
     constantInit(argc, argv, &sys);
     
@@ -177,11 +182,15 @@ void constantInit(int argc, char *argv[], data* sys){
         sys->dL = fminf(3/sys->L, 1.0);
     }
 
-    sys->shear_start /= sys->dt;
-    sys->n_to_shear_max = round(sys->gamma_max/(sys->dt*sys->parameter.gamma_rate));
-    sys->parameter.gamma_rate = sys->gamma_max/(sys->dt*sys->n_to_shear_max); //so that it's exactly gamma_max at the end
-    sys->parameter.gamma_rate *= -1; //because I'm reversing the shear at shear_start in integrator.c
-
+    if (sys->parameter.gamma_rate == 0.0){
+        sys->shear_start = INT32_MAX;
+    }
+    else{
+        sys->shear_start /= sys->dt;
+        sys->n_to_shear_max = round(sys->gamma_max/(sys->dt*sys->parameter.gamma_rate));
+        sys->parameter.gamma_rate = sys->gamma_max/(sys->dt*sys->n_to_shear_max); //so that it's exactly gamma_max at the end
+        sys->parameter.gamma_rate *= -1; //because I'm reversing the shear at shear_start in integrator.c
+    }
     if (sys->info_snapshot.n_start == -1){
         sys->info_snapshot.n_start = sys->shear_start;
     }
@@ -203,6 +212,13 @@ void constantInit(int argc, char *argv[], data* sys){
 	sys->info_snapshot.file = fopen(filename, "w");
 	sprintf(filename, "dump/N_%dPo_%fgamma_%f.thermo", sys->N, sys->parameter.Po, sys->gamma_max);
 	sys->info_thermo.file = fopen(filename, "w");
-    fprintf(sys->info_thermo.file, "i E p shear gamma\n");
+    fprintf(sys->info_thermo.file, "i E gamma_actual ");
+    if (sys->info_thermo.compute_stress){
+        fprintf(sys->info_thermo.file, "P shear ");
+    }
+    if (sys->info_thermo.compute_dist_travelled){
+        fprintf(sys->info_thermo.file, "frac_active ");
+    }
+    fprintf(sys->info_thermo.file, "\n");
 }
 

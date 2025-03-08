@@ -17,6 +17,9 @@ struct logger_thermo_{
     int n_log;
     int n_start;
     FILE* file;
+
+    int compute_stress;
+    int compute_dist_travelled;
 };
 
 struct logger_snapshot_{
@@ -25,6 +28,11 @@ struct logger_snapshot_{
 
     int include_boundary;
     FILE* file;
+
+    int compute_stress;
+    int compute_dist_travelled;
+    int compute_area;
+    int compute_perimeter;
 };
 
 struct memory_{

@@ -1,7 +1,6 @@
 *
 !Makefile
 !.gitignore
-!plot_edges.py
 !jc_voronoi.h
 !mersenne.c
 !.vscode/*
@@ -12,3 +11,5 @@
 !initial.*
 !integrator.*
 !logger.*
+!thermo.*
+cell.py
