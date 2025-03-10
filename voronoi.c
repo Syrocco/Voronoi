@@ -11,38 +11,39 @@
 #include "voronoi.h"
 #include "integrator.h"
 #include <getopt.h>
-
+#include <errno.h>
 
 
 int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
-    sys.parameter.qo = 3.75;
+    sys.parameter.qo = 3.65;
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
 
-    sys.size_large_over_small = 4.0/3.0;
+    sys.size_large_over_small = 3.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 10000; 
-    sys.dt = 0.1;
+    sys.M = 100000; 
+    sys.dt = 0.05;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0;
-    sys.gamma_max = 1;
+    sys.parameter.gamma_rate = 0.0;
+    sys.gamma_max = 0.605263;
     sys.shear_start = 0;
+    sys.dt_fire = 0.01;
 
-    sys.info_snapshot.n_log = 100;
-    sys.info_snapshot.n_start = 0;
+    sys.info_snapshot.n_log = 5;
+    sys.info_snapshot.n_start = 1;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 0;
     sys.info_snapshot.compute_dist_travelled = 0;
-    sys.info_snapshot.compute_area = 1;
-    sys.info_snapshot.compute_perimeter = 1;
+    sys.info_snapshot.compute_area = 0;
+    sys.info_snapshot.compute_perimeter = 0;
 
-    sys.info_thermo.n_log = 100;
-    sys.info_thermo.n_start = 0;
+    sys.info_thermo.n_log = 10;
+    sys.info_thermo.n_start = 1;
     sys.info_thermo.compute_stress = 1;
     sys.info_thermo.compute_dist_travelled = 1;
     
@@ -50,10 +51,10 @@ int main(int argc, char *argv[]){
     
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
-    jcv_point positions[3*sys.N]; //9*sys.N == max N_pbc
+    jcv_point positions[9*sys.N]; //9*sys.N == max N_pbc
     jcv_point velocities[sys.N];
     jcv_point forces[sys.N];
-    jcv_real prefered_area[3*sys.N];
+    jcv_real prefered_area[9*sys.N];
     sys.diagram = &diagram;
     sys.positions = positions;
     sys.velocities = velocities;
@@ -114,7 +115,7 @@ void constantInit(int argc, char *argv[], data* sys){
                 break;
             case 'q':
                 #if JCV_type == 0
-                    sscanf(optarg, "%f", &sys->parameter.Po);
+                    sscanf(optarg, "%f", &sys->parameter.qo);
                 #else
                     sscanf(optarg, "%lf", &sys->parameter.qo);
                 #endif
@@ -177,7 +178,7 @@ void constantInit(int argc, char *argv[], data* sys){
         return;
     }
     if (control_dL == 0){
-        sys->dL = fminf(3/sys->L, 1.0);
+        sys->dL = fminf(8/sys->L, 1.0);
     }
 
     if (sys->parameter.gamma_rate == 0.0){
@@ -206,10 +207,19 @@ void constantInit(int argc, char *argv[], data* sys){
     }
 
 	char filename[256];
-	sprintf(filename, "dump/N_%dqo_%fgamma_%f.dump", sys->N, sys->parameter.qo, sys->gamma_max);
-	sys->info_snapshot.file = fopen(filename, "w");
-	sprintf(filename, "dump/N_%dqo_%fgamma_%f.thermo", sys->N, sys->parameter.qo, sys->gamma_max);
-	sys->info_thermo.file = fopen(filename, "w");
+    int version = 1;
+    do {
+        sprintf(filename, "dump/N_%dqo_%fgamma_%f_v_%d.dump", sys->N, sys->parameter.qo, sys->gamma_max, version);
+        sys->info_snapshot.file = fopen(filename, "wx");
+        if (sys->info_snapshot.file == NULL && errno == EEXIST) {
+            version++;
+        } else {
+            sprintf(filename, "dump/N_%dqo_%fgamma_%f_v_%d.thermo", sys->N, sys->parameter.qo, sys->gamma_max, version);
+            sys->info_thermo.file = fopen(filename, "wx");
+            break;
+        }
+    } while (1);
+
     fprintf(sys->info_thermo.file, "i E gamma_actual ");
     if (sys->info_thermo.compute_stress){
         fprintf(sys->info_thermo.file, "P shear ");

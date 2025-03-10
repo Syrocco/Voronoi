@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "jconfig.h"
 #include "helper.h"
 #include <stdio.h>
 #include "voronoi.h"

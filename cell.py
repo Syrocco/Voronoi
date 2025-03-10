@@ -7,6 +7,11 @@ from cmap import Colormap
 import os
 import subprocess
 from matplotlib.collections import PolyCollection
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+from mpl_toolkits.axes_grid1 import make_axes_locatable  # Add this import
+
+cbar = None
 
 class Cell(Dump):
     def __init__(self, loc):
@@ -21,18 +26,21 @@ class Cell(Dump):
         else:
             path = self.path + ".thermo"
         with open(path, 'r') as file:
-            first_line = file.readline().strip()
-            column_names = first_line.split()
             try:
-                data = np.loadtxt(path, skiprows = 1)
+                first_line = file.readline().strip()
+                column_names = first_line.split()
+                try:
+                    data = np.loadtxt(path, skiprows = 1)
+                except:
+                    data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+    
+                if data.ndim == 1:
+                    data = data.reshape(1, -1)
+    
+                for i, col_name in enumerate(column_names):
+                    setattr(self, col_name, data[:, i])
             except:
-                data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
-
-            if data.ndim == 1:
-                data = data.reshape(1, -1)
-
-            for i, col_name in enumerate(column_names):
-                setattr(self, col_name, data[:, i])
+                print("could not recover .thermo")
     def extract_variables(self):
         # Define the pattern to match variable names and values
         pattern = r'(\w+?)_(\d*\.?\d+)'
@@ -76,7 +84,9 @@ class Cell(Dump):
         cadd=list(c[dL*y>L*(x-size)])+list(c[y<size])+list(c[np.logical_and(dL*y>L*(x-size),y<size)])+list(c[dL*y<L*(x+size-L)])+list(c[y>L-size])+list(c[np.logical_and(dL*y<L*(x+size-L),y>L-size)])+list(c[np.logical_and(dL*y>L*(x-size),y>L-size)])+list(c[np.logical_and(dL*y<L*(x+size-L),y<size)])
         C=np.array(list(c)+cadd)
         return X,Y,C
-    def voronoi(self, frame = -1, prop = "area", cmap = "cmocean:delta", fig = None, ax = None):
+    def voronoi(self, frame = -1, prop = "area", cmap = "cmocean:delta", fig = None, ax = None, shear = True, bar = True):
+        global cbar
+        
         if frame < 0:
             frame = self.nframes + frame
         self.jump_to_frame(frame)
@@ -84,7 +94,7 @@ class Cell(Dump):
         
         # Optimize colormap calculation
         C_norm = (C - np.min(C)) / (np.max(C) - np.min(C))
-        colormap = Colormap(cmap)
+        colormap = Colormap(cmap).to_mpl()
         C_colors = colormap(C_norm)
         
         # Optimize point calculation
@@ -93,7 +103,12 @@ class Cell(Dump):
     
         
         # Pre-compute vertices for plotting
-        regions = [vor.regions[vor.point_region[i]] for i in range(self.N)]
+        if shear:
+            lenght = self.N
+        else:
+            lenght = len(X)
+            
+        regions = [vor.regions[vor.point_region[i]] for i in range(lenght)]
         valid_regions = [(i, region) for i, region in enumerate(regions) 
                          if region and -1 not in region]
         
@@ -107,36 +122,68 @@ class Cell(Dump):
                 polys.append(polygon)
                 colors.append(C_colors[i])
         
+        if shear:
+            l = (1 + self.gamma)
+        else:
+            l = 1
         if fig == None or ax == None:
-            fig = plt.figure(figsize=(4*(1 + self.gamma), 4), layout='constrained')
+            fig = plt.figure(figsize=(4*l, 4), layout='constrained')
             ax = plt.gca()
-        plt.axis("square")
-        plt.axis("off")
+        ax.axis("square")
+        ax.axis("off")
         
         pc = PolyCollection(polys, facecolors=colors, edgecolors='k', alpha=0.8)
         ax.add_collection(pc)
         
         # Plot points once
-        plt.plot(X[:self.N], Y[:self.N], '.', c='k')
-        plt.xlim(0, self.L*(1+self.gamma))
-        plt.ylim(0, self.L)
+        ax.plot(X[:self.N], Y[:self.N], '.', c='k')
+        ax.set_xlim(0, self.L*l)
+        ax.set_ylim(0, self.L)
+
+        if bar:
+            if cbar is None:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size="5%", pad=0.05)
+    
+                norm = Normalize(vmin=np.min(C), vmax=np.max(C))
+                sm = ScalarMappable(cmap=colormap, norm=norm)
+                sm.set_array([])
+                cbar = plt.colorbar(sm, cax=cax)
+                cbar.set_label(prop)
+            else:
+                norm = Normalize(vmin=np.min(C), vmax=np.max(C))
+                sm = ScalarMappable(cmap=colormap, norm=norm)
+                sm.set_array([])
+                
+                cbar.update_normal(sm)
         
-    def batch(self,prop,cmap="cmasher:viola"):
-        last = self.nframes
-        os.makedirs(self.path+f'batch_{prop}', exist_ok = True)
-        fig = plt.figure(figsize=(4*(1 + self.gamma), 4), layout='constrained')
+    def batch(self, prop, start, end, step, cmap="cmasher:viola", shear = True, bar = True):
+        
+        os.makedirs(self.path + f'batch_{prop}', exist_ok = True)
+        if shear:
+            l = 1 + self.gamma
+        else:
+            l = 1
+        fig = plt.figure(figsize = (4*l, 4), layout='constrained')
         ax = plt.gca()
-        for i in range(last):
+        count = 0
+        if end < 0:
+            last = self.nframes + 1 + end
+        else:
+            last = end
+        for i in range(start, last, step):
             print(i, "/", last)
-            self.voronoi(i,prop,cmap,fig = fig, ax = ax)
-            plt.savefig(self.path+f'batch_{prop}/{i:04}.png')
+            self.voronoi(i, prop, cmap, fig = fig, ax = ax, shear = shear, bar = bar)
+            plt.savefig(self.path + f'batch_{prop}/{count:04}.png', pad_inches = 0, bbox_inches="tight")
             ax.clear()
+            count += 1
         plt.close()
-    def save(self, prop,frame_rate=10,cmap="cmasher:viola"):
-        if not os.path.exists(self.path+f'batch_{prop}'):
-            self.batch(prop,cmap=cmap)
-        input_pattern = self.path+fr'batch_{prop}/%04d.png' 
-        output_video = self.path+f'batch_{prop}.gif'
+        
+    def save(self, prop, start = 0, end = -1, step = 1, frame_rate = 10, cmap="cmasher:viola", shear = True, bar = True):
+        if not os.path.exists(self.path + f'batch_{prop}'):
+            self.batch(prop, start, end, step, cmap = cmap, shear = shear, bar = bar)
+        input_pattern = self.path + fr'batch_{prop}/%04d.png' 
+        output_video = self.path + f'batch_{prop}.gif'
 
         ffmpeg_cmd = [
             "ffmpeg",
@@ -151,5 +198,12 @@ class Cell(Dump):
         
         
 
-a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_4010Po_4.000000gamma_1.000000.dump")
-a.save("area")
+a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.900000gamma_0.605263_v_3.dump")
+#a.voronoi(shear = False, prop = "fx")
+a.save("fx", start = 0, end = -1, step = 100, bar = True, shear = False)
+
+if 0:
+    plt.plot(a.gamma_actual[1:], a.shear[1:])
+    
+    plt.xlabel(r"$\gamma$")
+    plt.ylabel(r"$\sigma_{xy}$ (a.u)")

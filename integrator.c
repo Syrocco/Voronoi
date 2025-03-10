@@ -27,16 +27,13 @@ void eulerStep(data* sys){
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     
-
-
     loggers(sys);
-
-        
+    
     shear(sys);
 
     //TIME_FUNCTION(compute_force, sys);
     compute_force(sys);
-
+    
     sys->N_pbc = sys->N;
     jcv_real forcex = 0;
     jcv_real forcey = 0;
@@ -59,6 +56,7 @@ void eulerStep(data* sys){
         forcey += sys->forces[i].y;
     }
     
+    
     if ((forcex*forcex + forcey*forcey)/sys->N > 0.00001){
         //printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
         //exit(3);
@@ -67,10 +65,17 @@ void eulerStep(data* sys){
 }
 
 void fireStep(data* sys){
-    if ((sys->i + 1)%100 == 0){
-        sys->parameter.gamma_rate *= -1;
-    }
-    sys->gamma += sys->dt*sys->parameter.gamma_rate;
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    
+
+
+    loggers(sys);
+
+        
+    
+
+
     jcv_real P = 0.0;
     jcv_real fnorm = 0.0;
     jcv_real vnorm = 0.0;
@@ -81,10 +86,10 @@ void fireStep(data* sys){
     const jcv_real f_inc = 1.1;
     const jcv_real f_dec = 0.5;
     const jcv_real f_alpha = 0.99;
-    const int n_delay = 5;
+    const int n_delay = 20;
     
-    const jcv_real dt_max = sys->dt;
-    const jcv_real dt_min = sys->dt/100;
+    const jcv_real dt_max = sys->dt_fire;
+    const jcv_real dt_min = sys->dt_fire/100;
 
     int n_pos = 0;
     jcv_real dt_now = sys->dt;
@@ -94,8 +99,9 @@ void fireStep(data* sys){
         sys->velocities[i].x = 0;
         sys->velocities[i].y = 0;
     }
+    int count = 0;
     do{
-
+        count++;
         jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
         sys->sites = jcv_diagram_get_sites(sys->diagram);
 
@@ -116,7 +122,6 @@ void fireStep(data* sys){
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
 
-        printf("fnorm = %.10lf, dt_now = %f, P = %.10lf, alpha_now = %f \n", fnorm/sys->L, dt_now, P, alpha_now);
 
 
         if (P > 0){
@@ -148,13 +153,29 @@ void fireStep(data* sys){
             pbc(&sys->positions[i], sys->L, sys->gamma);
             addBoundary(sys, i);
         }
+  
+
         
-        loggers(sys);
-        if (fnorm/sys->L < 1e-9){
-            printf("%lf \n", (fnorm/sys->L)/1e-10);
+        if (count > 10000){
+            printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf\n", fnorm, vnorm, P, dt_now);
+            if (count > 10200){
+                printf("Failed to converge\n");
+                exit(3);
+            } 
         }
-    } while (fnorm/sys->L > 1e-10); // L = sqrt((float)N)
-   
-    exit(3);
+    } while (fnorm/sys->L > 1e-14); // L = sqrt((float)N)
+
+    shear(sys);
+    sys->N_pbc = sys->N;
+    if (sys->i - sys->shear_start >= 0){
+        for (int i = 0; i < sys->N; i++){
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+    }
+    
+    
+
 }
 

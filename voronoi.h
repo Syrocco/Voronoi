@@ -68,7 +68,7 @@ struct data_
     int shear_start;
     int n_to_shear_max;
 
-    jcv_real dt;
+    jcv_real dt, dt_fire;
     parameter parameter;
     int N;
     int M;

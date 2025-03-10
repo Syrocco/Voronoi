@@ -124,7 +124,7 @@ void saveTXT(data* sys){
             fprintf(file, "\n");
         }
         else{
-            fprintf(file, "%d %lf %lf %lf %lf %.12lf %.12lf ", i, p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
+            fprintf(file, "%d %lf %lf %.16lf %.16lf %.16lf %.16lf ", i, p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "%lf ", (stress[i][0][1] + stress[i][1][0])/2);
             }
