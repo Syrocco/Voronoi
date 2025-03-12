@@ -67,7 +67,8 @@ struct data_
     jcv_real gamma_max;
     int shear_start;
     int n_to_shear_max;
-
+    int shear_cycle;
+    
     jcv_real dt, dt_fire;
     parameter parameter;
     int N;

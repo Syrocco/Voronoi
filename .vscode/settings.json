@@ -16,6 +16,7 @@
         "initial.h": "c",
         "climits": "cpp",
         "stdint.h": "c",
-        "logger.h": "c"
+        "logger.h": "c",
+        "omp.h": "c"
     }
 }

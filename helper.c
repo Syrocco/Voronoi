@@ -95,7 +95,7 @@ void pbc(jcv_point* p, jcv_real L, jcv_real gamma){
     }
 }
 
-//Will not work with dL > 0.5
+
 void addBoundary(data* sys, int i){
     /* int val = 1;
     for (int l = -val; l <= val; l++){
@@ -112,11 +112,11 @@ void addBoundary(data* sys, int i){
     jcv_real dL = sys->dL;
 
     // Adjust the conditions for left and right boundaries
-    int left = (sys->positions[i].x - sys->positions[i].y*gamma)/L < dL;
-    int right = (sys->positions[i].x - sys->positions[i].y*gamma)/L > 1 - dL;
+    int left = (sys->positions[i].x - sys->positions[i].y*gamma)/L < dL*JCV_SQRT(1 + gamma);
+    int right = (sys->positions[i].x - sys->positions[i].y*gamma)/L > 1 - dL*JCV_SQRT(1 + gamma);
     int bottom = sys->positions[i].y/L < dL;
     int top = sys->positions[i].y/L >  1 - dL;
-    if (left || right) {
+    /* if (left || right) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y;
         sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
@@ -131,6 +131,54 @@ void addBoundary(data* sys, int i){
     if ((left && bottom) || (right && bottom) || (left && top) || (right && top)) {
         sys->positions[sys->N_pbc].x = sys->positions[i].x + gamma*(bottom ? L : -L) + (left ? L : -L);
         sys->positions[sys->N_pbc].y = sys->positions[i].y + (bottom ? L : -L);
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    }  */
+    if (left) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (right) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x - L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (bottom) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + L;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (top) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x - gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y - L;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (left && bottom) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + L + gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + L;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (right && bottom) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x - L + gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y + L;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (left && top) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x + L - gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y - L;
+        sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
+        sys->N_pbc++;
+    } 
+    if (right && top) {
+        sys->positions[sys->N_pbc].x = sys->positions[i].x - L - gamma * L;
+        sys->positions[sys->N_pbc].y = sys->positions[i].y - L;
         sys->prefered_area[sys->N_pbc] = sys->prefered_area[i];
         sys->N_pbc++;
     } 

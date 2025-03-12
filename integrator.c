@@ -18,8 +18,6 @@
     } while (0)
 
 
-
-
 void eulerStep(data* sys){
 
 
@@ -92,7 +90,7 @@ void fireStep(data* sys){
     const jcv_real dt_min = sys->dt_fire/100;
 
     int n_pos = 0;
-    jcv_real dt_now = sys->dt;
+    jcv_real dt_now = sys->dt_fire/2;
     jcv_real alpha_now = alpha_start;
 
     for (int i = 0; i < sys->N; i++){
@@ -101,12 +99,13 @@ void fireStep(data* sys){
     }
     int count = 0;
     do{
+        
+
         count++;
         jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
         sys->sites = jcv_diagram_get_sites(sys->diagram);
 
         compute_force(sys);
-
         P = 0;
         fnorm = 0;
         vnorm = 0;
@@ -121,7 +120,14 @@ void fireStep(data* sys){
 
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
-
+        if (count > 10000){
+            printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf, E = %lf\n", fnorm, vnorm, P, dt_now, energy_total(sys));
+            if (count > 20000){
+                printf("Failed to converge\n");
+                unexpectedClosure(sys);
+                exit(3);
+            } 
+        }
 
 
         if (P > 0){
@@ -156,18 +162,10 @@ void fireStep(data* sys){
   
 
         
-        if (count > 10000){
-            printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf\n", fnorm, vnorm, P, dt_now);
-            if (count > 10200){
-                printf("Failed to converge\n");
-                exit(3);
-            } 
-        }
-    } while (fnorm/sys->L > 1e-14); // L = sqrt((float)N)
-
-    shear(sys);
-    sys->N_pbc = sys->N;
+    } while (fnorm/sys->L > 1e-7); // L = sqrt((float)N)
+    shear(sys); 
     if (sys->i - sys->shear_start >= 0){
+        sys->N_pbc = sys->N;
         for (int i = 0; i < sys->N; i++){
             sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
             pbc(&sys->positions[i], sys->L, sys->gamma);

@@ -10,17 +10,24 @@ from matplotlib.collections import PolyCollection
 from matplotlib.colors import Normalize
 from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # Add this import
-
+from glob import glob
+import imageio
 cbar = None
 
+def cellArray(loc, dump = False):
+    return [Cell(data, dump) for data in sorted(glob(loc))]
+
 class Cell(Dump):
-    def __init__(self, loc):
+    def __init__(self, loc, dump = True):
         self.loc = loc
-        
-        Dump.__init__(self, loc)
+        if dump:
+            Dump.__init__(self, loc)
         self.extract_variables()
         self.L = np.sqrt(self.N)
-        self.path = path = loc.split(".dump")[0]
+        try:
+            self.path = path = loc.split(".dump")[0]
+        except:
+            self.path = path = loc.split(".thermo")[0]
         if loc[-1] == "o":
             path = loc
         else:
@@ -66,20 +73,55 @@ class Cell(Dump):
         
         self.jump_to_frame(frame)
         L = self.L
-        dL = self.get_boxx()[0] - L
+        dL = self.get_boxxy()
+        if dL >= 0:
+            dL = self.get_boxx()[0] - L
         
-        size = 8 
+        size = 3 
         x = self.get_atompropf("x")
         y = self.get_atompropf("y")
-        xadd=list(x[dL*y>L*(x-size)]+L)+list(x[y<size]+dL)+list(x[np.logical_and(dL*y>L*(x-size),y<size)]+L+dL)+list(x[dL*y<L*(x+size-L)]-L)+list(x[y>L-size]-dL)+list(x[np.logical_and(dL*y<L*(x+size-L),y>L-size)]-L-dL)+list(x[np.logical_and(dL*y>L*(x-size),y>L-size)]+L-dL)+list(x[np.logical_and(dL*y<L*(x+size-L),y<size)]-L+dL)
-        yadd=list(y[dL*y>L*(x-size)])+list(y[y<size]+L)+list(y[np.logical_and(dL*y>L*(x-size),y<size)]+L)+list(y[dL*y<L*(x+size-L)])+list(y[y>L-size]-L)+list(y[np.logical_and(dL*y<L*(x+size-L),y>L-size)]-L)+list(y[np.logical_and(dL*y>L*(x-size),y>L-size)]-L)+list(y[np.logical_and(dL*y<L*(x+size-L),y<size)]+L)
-        # xadd=list(x[x<size]+self.L)+list(x[y<size])+list(x[np.logical_and(x<size,y<size)]+self.L)+list(x[x>self.L-size]-self.L)+list(x[y>self.L-size])+list(x[np.logical_and(x>self.L-size,y>self.L-size)]-self.L)+list(x[np.logical_and(x<size,y>self.L-size)]+self.L)+list(x[np.logical_and(x>self.L-size,y<size)]-self.L)
-        # yadd=list(y[x<size])+list(y[y<size]+self.L)+list(y[np.logical_and(x<size,y<size)]+self.L)+list(y[x>self.L-size])+list(y[y>self.L-size]-self.L)+list(y[np.logical_and(x>self.L-size,y>self.L-size)]-self.L)+list(y[np.logical_and(x<size,y>self.L-size)]-self.L)+list(y[np.logical_and(x>self.L-size,y<size)]+self.L)
+        # Add points around x and y in a sheared box with periodic boundary conditions
+        mask1 = dL * y > L * (x - size)
+        mask2 = y < size
+        mask3 = dL * y < L * (x + size - L)
+        mask4 = y > L - size
+
+        xadd = (
+            list(x[mask1] + L) +
+            list(x[mask2] + dL) +
+            list(x[mask3] - L) +
+            list(x[mask4] - dL) +
+            list(x[mask1 & mask2] + L + dL) +
+            list(x[mask3 & mask4] - L - dL) +
+            list(x[mask1 & mask4] + L - dL) +
+            list(x[mask3 & mask2] - L + dL)
+        )
+        yadd = (
+            list(y[mask1]) +
+            list(y[mask2] + L) +
+            list(y[mask3]) +
+            list(y[mask4] - L) +
+            list(y[mask1 & mask2] + L) +
+            list(y[mask3 & mask4] - L) +
+            list(y[mask1 & mask4] - L) +
+            list(y[mask3 & mask2] + L)
+        )
         X=np.array(list(x)+xadd)
         Y=np.array(list(y)+yadd)
+        
         if prop == None:
             return X, Y
-        c= self.get_atompropf(prop)
+        
+        
+        variables = re.findall(r'\b\w+\b', prop)
+        local_vars = {var: self.get_atompropf(var) for var in variables}
+    
+        # Evaluate the property expression
+        try:
+            c = eval(prop, {"__builtins__": None, "np": np}, local_vars)
+        except Exception as e:
+            raise ValueError(f"Error evaluating property expression '{prop}': {e}")
+        
         # cadd=list(c[x<size])+list(c[y<size])+list(c[np.logical_and(x<size,y<size)])+list(c[x>self.L-size])+list(c[y>self.L-size])+list(c[np.logical_and(x>self.L-size,y>self.L-size)])+list(c[np.logical_and(x<size,y>self.L-size)])+list(c[np.logical_and(x>self.L-size,y<size)])
         cadd=list(c[dL*y>L*(x-size)])+list(c[y<size])+list(c[np.logical_and(dL*y>L*(x-size),y<size)])+list(c[dL*y<L*(x+size-L)])+list(c[y>L-size])+list(c[np.logical_and(dL*y<L*(x+size-L),y>L-size)])+list(c[np.logical_and(dL*y>L*(x-size),y>L-size)])+list(c[np.logical_and(dL*y<L*(x+size-L),y<size)])
         C=np.array(list(c)+cadd)
@@ -94,8 +136,12 @@ class Cell(Dump):
         
         # Optimize colormap calculation
         C_norm = (C - np.min(C)) / (np.max(C) - np.min(C))
-        colormap = Colormap(cmap).to_mpl()
-        C_colors = colormap(C_norm)
+        try:
+            colormap = Colormap(cmap).to_mpl()
+            C_colors = colormap(C_norm)
+        except:
+            import matplotlib.cm as cm
+            C_colors = cm.get_cmap(cmap)
         
         # Optimize point calculation
         points = np.vstack((X, Y)).T
@@ -123,11 +169,11 @@ class Cell(Dump):
                 colors.append(C_colors[i])
         
         if shear:
-            l = (1 + self.gamma)
+            l = 1 + 2*self.gamma
         else:
             l = 1
         if fig == None or ax == None:
-            fig = plt.figure(figsize=(4*l, 4), layout='constrained')
+            fig = plt.figure(figsize=(4*l, 5.2), layout='constrained')
             ax = plt.gca()
         ax.axis("square")
         ax.axis("off")
@@ -137,19 +183,21 @@ class Cell(Dump):
         
         # Plot points once
         ax.plot(X[:self.N], Y[:self.N], '.', c='k')
-        ax.set_xlim(0, self.L*l)
+        ax.set_xlim(-self.L*self.gamma, self.L*(1 + self.gamma))
         ax.set_ylim(0, self.L)
 
         if bar:
             if cbar is None:
                 divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size="5%", pad=0.05)
-    
+                cax = divider.append_axes("bottom", size="5%", pad=0.05)
+                cax.autoscale_view()
+                cax.autoscale(False)
                 norm = Normalize(vmin=np.min(C), vmax=np.max(C))
                 sm = ScalarMappable(cmap=colormap, norm=norm)
                 sm.set_array([])
-                cbar = plt.colorbar(sm, cax=cax)
+                cbar = plt.colorbar(sm, cax=cax, orientation  = "horizontal")
                 cbar.set_label(prop)
+                fig.set_size_inches(4*l, 5.2)
             else:
                 norm = Normalize(vmin=np.min(C), vmax=np.max(C))
                 sm = ScalarMappable(cmap=colormap, norm=norm)
@@ -161,11 +209,13 @@ class Cell(Dump):
         
         os.makedirs(self.path + f'batch_{prop}', exist_ok = True)
         if shear:
-            l = 1 + self.gamma
+            l = 1 + 2*self.gamma
         else:
             l = 1
         fig = plt.figure(figsize = (4*l, 4), layout='constrained')
         ax = plt.gca()
+        ax.autoscale_view()
+        ax.autoscale(False)
         count = 0
         if end < 0:
             last = self.nframes + 1 + end
@@ -174,33 +224,74 @@ class Cell(Dump):
         for i in range(start, last, step):
             print(i, "/", last)
             self.voronoi(i, prop, cmap, fig = fig, ax = ax, shear = shear, bar = bar)
-            plt.savefig(self.path + f'batch_{prop}/{count:04}.png', pad_inches = 0, bbox_inches="tight")
+            plt.savefig(self.path + f'batch_{prop}/{count:04}.png', pad_inches = 0.1, bbox_inches=None)
             ax.clear()
             count += 1
         plt.close()
         
-    def save(self, prop, start = 0, end = -1, step = 1, frame_rate = 10, cmap="cmasher:viola", shear = True, bar = True):
-        if not os.path.exists(self.path + f'batch_{prop}'):
+    def save(self, prop, start = 0, end = -1, step = 1, frame_rate = 10, cmap="cmasher:viola", shear = True, bar = True, overide = False):
+        if not os.path.exists(self.path + f'batch_{prop}') or overide:
             self.batch(prop, start, end, step, cmap = cmap, shear = shear, bar = bar)
-        input_pattern = self.path + fr'batch_{prop}/%04d.png' 
-        output_video = self.path + f'batch_{prop}.gif'
+        if True:
+            inp = self.path + fr'batch_{prop}/*'
+            output_video = self.path + f'batch_{prop}.gif'
+    
+            images = []
+            for i in sorted(glob(inp)):
+                images.append(imageio.imread(i))
+            
+            imageio.mimsave(output_video, images, fps=frame_rate)
+        else:
+            input_pattern = self.path + fr'batch_{prop}/%04d.png' 
+            output_video = self.path + f'batch_{prop}.gif'
+    
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-y",
+                "-framerate", str(frame_rate),
+                "-i", input_pattern,
+                output_video
+            ]
+            subprocess.run(ffmpeg_cmd, check=True)
 
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-y",
-            "-framerate", str(frame_rate),
-            "-i", input_pattern,
-            output_video
-        ]
+if 0:      
 
-        subprocess.run(ffmpeg_cmd, check=True)
-        
-        
-        
+    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.850000gamma_0.500000gammarate_0.100000Ka_0.000000v_3202.dump")
+    #a.voronoi(frame = 15, shear = False, prop = "shear")
+    'cmasher:pepper'
+    a.save("shear", cmap ='jet', bar = True, shear = True, overide=False, frame_rate = 3)
 
-a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.900000gamma_0.605263_v_3.dump")
-#a.voronoi(shear = False, prop = "fx")
-a.save("fx", start = 0, end = -1, step = 100, bar = True, shear = False)
+if 0:
+    files = glob("dump2/*.dump")
+    cells = [Cell(file, False) for file in files]
+    gammarate = np.array(sorted(list(set([cell.gammarate for cell in cells]))))
+    gamma = np.array(sorted(list(set([cell.gamma for cell in cells]))))
+    active = np.zeros((len(gamma), len(gammarate)))*np.nan
+    time = np.zeros((len(gamma), len(gammarate)))*np.nan
+    co = np.zeros((len(gamma), len(gammarate))).astype(str)
+    marker = ["*", "s", "."]
+    for cell in cells:
+        g = np.where(cell.gamma == gamma)[0][0]
+        G = np.where(cell.gammarate == gammarate)[0][0]
+        active[g, G] = cell.frac_active[-1]/300
+        time[g, G] = len(cell.frac_active)
+        if active[g, G] > 0.5:
+            co[g, G] = "red"
+        else:
+            co[g, G] = "black"
+        
+    plt.subplot(121)
+    for i in range(len(gammarate)):
+        plt.scatter(gamma, active[:, i], marker = marker[i], alpha = 0.7, label = gammarate[i])
+    plt.legend(title = r"$\Delta \gamma$")
+    plt.xlabel(r"$\gamma_{max}$")
+    plt.ylabel(r"frac active")
+    plt.subplot(122)
+    for i in range(len(gammarate)):
+        plt.scatter(gamma, time[:, i], marker = marker[i], alpha = 0.7, label = gammarate[i], c = co[:, i])
+    plt.legend(title = r"$\Delta \gamma$")
+    plt.xlabel(r"$\gamma_{max}$")
+    plt.ylabel(r"number of cycles")
 
 if 0:
     plt.plot(a.gamma_actual[1:], a.shear[1:])

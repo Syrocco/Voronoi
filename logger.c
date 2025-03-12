@@ -22,7 +22,7 @@ void computeThermo(data* sys){
     
     
 
-    jcv_real E = energy_total(sys);
+    jcv_real E = energy_total(sys)/sys->N;
     fprintf(sys->info_thermo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
     printf("i = %d, E = %lf, γ = %lf ", sys->i, E, sys->gamma);
 
@@ -36,7 +36,7 @@ void computeThermo(data* sys){
     }
     
     if (sys->info_thermo.compute_dist_travelled){
-        int frac_active = 0;
+        jcv_real frac_active = 0;
         jcv_real distance_move[sys->N];
         distance_moved(sys, sys->old_info.old_positions_thermo, distance_move);
         for (int i = 0; i < sys->N; i++){
@@ -48,14 +48,13 @@ void computeThermo(data* sys){
                 frac_active++;
             }
         }
-        fprintf(sys->info_thermo.file, "%d ", frac_active);
-        printf("frac_active = %d ", frac_active);
+        frac_active = frac_active/sys->N;
+        fprintf(sys->info_thermo.file, "%lf ", frac_active);
+        printf("frac_active = %lf ", frac_active);
     }
     fprintf(sys->info_thermo.file, "\n");
     printf("\n");
-    fflush(sys->info_thermo.file);
-
-    
+    fflush(sys->info_thermo.file);    
 }
 
 void saveTXT(data* sys){
@@ -78,7 +77,7 @@ void saveTXT(data* sys){
 
  
 
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n0 %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy ", m, NN, L + dL, dL, L);
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%f %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy ", m, NN, fmin(0, dL), fmax(L, L + dL), dL, L);
     if (sys->info_snapshot.compute_stress){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){
@@ -167,4 +166,16 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
         }
     }
     fclose(file);
+}
+
+void unexpectedClosure(data* sys){
+    fprintf(sys->info_thermo.file, "nan nan nan ");
+    if (sys->info_thermo.compute_stress){
+        fprintf(sys->info_thermo.file, "nan nan ");
+    }
+    
+    if (sys->info_thermo.compute_dist_travelled){
+        fprintf(sys->info_thermo.file, "nan ");
+    }
+    saveTXT(sys);
 }

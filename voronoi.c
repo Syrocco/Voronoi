@@ -27,23 +27,24 @@ int main(int argc, char *argv[]){
 
     sys.N = 300;
     sys.M = 100000; 
-    sys.dt = 0.05;
+    sys.dt = 1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.0;
-    sys.gamma_max = 0.605263;
+    sys.parameter.gamma_rate = 0.1;
+    sys.gamma_max = 3;
     sys.shear_start = 0;
-    sys.dt_fire = 0.01;
+    sys.dt_fire = 0.1;
+    sys.shear_cycle = 0;
 
-    sys.info_snapshot.n_log = 5;
-    sys.info_snapshot.n_start = 1;
+    sys.info_snapshot.n_log = 1;
+    sys.info_snapshot.n_start = -1;
     sys.info_snapshot.include_boundary = 0;
-    sys.info_snapshot.compute_stress = 0;
+    sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
     sys.info_snapshot.compute_area = 0;
     sys.info_snapshot.compute_perimeter = 0;
 
-    sys.info_thermo.n_log = 10;
-    sys.info_thermo.n_start = 1;
+    sys.info_thermo.n_log = 1;
+    sys.info_thermo.n_start = 0;
     sys.info_thermo.compute_stress = 1;
     sys.info_thermo.compute_dist_travelled = 1;
     
@@ -75,13 +76,12 @@ int main(int argc, char *argv[]){
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         
-        
-        eulerStep(&sys);
-        //fireStep(&sys);
+        //eulerStep(&sys);
+        fireStep(&sys);
 
         
     }
-
+    
 	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
@@ -105,10 +105,10 @@ void constantInit(int argc, char *argv[], data* sys){
         {NULL, 0, NULL, 0}
     };
     
-
+    int version = 1;
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:", longopt, NULL)) != -1){
+    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:G:v:", longopt, NULL)) != -1){
         switch(c){
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
@@ -166,6 +166,17 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &(sys->gamma_max));
                 #endif
                 break;
+            case 'G':
+                #if JCV_type == 0
+                    sscanf(optarg, "%f", &(sys->parameter.gamma_rate));
+                #else
+                    sscanf(optarg, "%lf", &(sys->parameter.gamma_rate));
+                #endif
+                break;
+            case 'v':
+                sscanf(optarg, "%d", &version);
+                init_genrand(version);
+                break;
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);
@@ -178,7 +189,7 @@ void constantInit(int argc, char *argv[], data* sys){
         return;
     }
     if (control_dL == 0){
-        sys->dL = fminf(8/sys->L, 1.0);
+        sys->dL = fminf(7/sys->L, 1.0);
     }
 
     if (sys->parameter.gamma_rate == 0.0){
@@ -195,7 +206,7 @@ void constantInit(int argc, char *argv[], data* sys){
     }
 
     if (sys->info_snapshot.n_log == -1){
-        sys->info_snapshot.n_log = 2*sys->n_to_shear_max; //need 2*n_to_shear_max to get the full cycle
+        sys->info_snapshot.n_log = 4*sys->n_to_shear_max; //need 2*n_to_shear_max to get the full cycle
     }
 
     if (sys->info_thermo.n_start == -1){
@@ -203,18 +214,21 @@ void constantInit(int argc, char *argv[], data* sys){
     }
 
     if (sys->info_thermo.n_log == -1){
-        sys->info_thermo.n_log = 2*sys->n_to_shear_max;
+        sys->info_thermo.n_log = 4*sys->n_to_shear_max;
+    }
+
+    if (sys->shear_cycle == 1){
+        sys->M = sys->shear_start + sys->n_to_shear_max;
     }
 
 	char filename[256];
-    int version = 1;
     do {
-        sprintf(filename, "dump/N_%dqo_%fgamma_%f_v_%d.dump", sys->N, sys->parameter.qo, sys->gamma_max, version);
+        sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d.dump", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
         sys->info_snapshot.file = fopen(filename, "wx");
         if (sys->info_snapshot.file == NULL && errno == EEXIST) {
             version++;
         } else {
-            sprintf(filename, "dump/N_%dqo_%fgamma_%f_v_%d.thermo", sys->N, sys->parameter.qo, sys->gamma_max, version);
+            sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d.thermo", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
             sys->info_thermo.file = fopen(filename, "wx");
             break;
         }
