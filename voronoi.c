@@ -22,7 +22,7 @@ int main(int argc, char *argv[]){
     sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
 
-    sys.size_large_over_small = 3.0/3.0;
+    sys.size_large_over_small = 4.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
@@ -40,8 +40,8 @@ int main(int argc, char *argv[]){
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
-    sys.info_snapshot.compute_area = 0;
-    sys.info_snapshot.compute_perimeter = 0;
+    sys.info_snapshot.compute_area = 1;
+    sys.info_snapshot.compute_perimeter = 1;
 
     sys.info_thermo.n_log = 1;
     sys.info_thermo.n_start = 0;
@@ -69,16 +69,17 @@ int main(int argc, char *argv[]){
 
 
     //randomInitial(&sys);
-    distribute_area(&sys);
-    rsaInitial(&sys, 0.4);
-    
+    //distribute_area(&sys);
+    //rsaInitial(&sys, 0.4);
+    read_from_dump_initial(&sys, "dump/N_300qo_3.650000gamma_3.000000gammarate_0.100000Ka_1.000000v_16.dump", 0);
 
+    
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         
         //eulerStep(&sys);
-        fireStep(&sys);
-
+        //fireStep(&sys);
+        conjugateGradientStep(&sys);
         
     }
     
@@ -189,7 +190,7 @@ void constantInit(int argc, char *argv[], data* sys){
         return;
     }
     if (control_dL == 0){
-        sys->dL = fminf(7/sys->L, 1.0);
+        sys->dL = fminf(5/sys->L, 1.0);
     }
 
     if (sys->parameter.gamma_rate == 0.0){
@@ -217,7 +218,7 @@ void constantInit(int argc, char *argv[], data* sys){
         sys->info_thermo.n_log = 4*sys->n_to_shear_max;
     }
 
-    if (sys->shear_cycle == 1){
+    if ((sys->shear_cycle == 0) && (sys->shear_start != INT32_MAX)){
         sys->M = sys->shear_start + sys->n_to_shear_max;
     }
 

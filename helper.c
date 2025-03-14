@@ -112,8 +112,8 @@ void addBoundary(data* sys, int i){
     jcv_real dL = sys->dL;
 
     // Adjust the conditions for left and right boundaries
-    int left = (sys->positions[i].x - sys->positions[i].y*gamma)/L < dL*JCV_SQRT(1 + gamma);
-    int right = (sys->positions[i].x - sys->positions[i].y*gamma)/L > 1 - dL*JCV_SQRT(1 + gamma);
+    int left = (sys->positions[i].x - sys->positions[i].y*gamma)/L < dL*JCV_SQRT(1 + jcv_abs(gamma));
+    int right = (sys->positions[i].x - sys->positions[i].y*gamma)/L > 1 - dL*JCV_SQRT(1 + jcv_abs(gamma));
     int bottom = sys->positions[i].y/L < dL;
     int top = sys->positions[i].y/L >  1 - dL;
     /* if (left || right) {

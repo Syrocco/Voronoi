@@ -13,3 +13,4 @@
 !logger.*
 !thermo.*
 !cell.py
+!parser.*

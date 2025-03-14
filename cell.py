@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable  # Add this import
 from glob import glob
 import imageio
 cbar = None
-
+axval = None
 def cellArray(loc, dump = False):
     return [Cell(data, dump) for data in sorted(glob(loc))]
 
@@ -126,8 +126,8 @@ class Cell(Dump):
         cadd=list(c[dL*y>L*(x-size)])+list(c[y<size])+list(c[np.logical_and(dL*y>L*(x-size),y<size)])+list(c[dL*y<L*(x+size-L)])+list(c[y>L-size])+list(c[np.logical_and(dL*y<L*(x+size-L),y>L-size)])+list(c[np.logical_and(dL*y>L*(x-size),y>L-size)])+list(c[np.logical_and(dL*y<L*(x+size-L),y<size)])
         C=np.array(list(c)+cadd)
         return X,Y,C
-    def voronoi(self, frame = -1, prop = "area", cmap = "cmocean:delta", fig = None, ax = None, shear = True, bar = True):
-        global cbar
+    def voronoi(self, frame = -1, prop = "area", cmap = "cmocean:delta", fig = None, ax = None, shear = True, bar = True, quant = None):
+        global cbar, axval
         
         if frame < 0:
             frame = self.nframes + frame
@@ -173,7 +173,7 @@ class Cell(Dump):
         else:
             l = 1
         if fig == None or ax == None:
-            fig = plt.figure(figsize=(4*l, 5.2), layout='constrained')
+            fig = plt.figure(figsize=(4*l, 4), layout='constrained')
             ax = plt.gca()
         ax.axis("square")
         ax.axis("off")
@@ -183,7 +183,10 @@ class Cell(Dump):
         
         # Plot points once
         ax.plot(X[:self.N], Y[:self.N], '.', c='k')
-        ax.set_xlim(-self.L*self.gamma, self.L*(1 + self.gamma))
+        if shear:
+            ax.set_xlim(-self.L*self.gamma, self.L*(1 + self.gamma))
+        else:
+            ax.set_xlim(0, self.L)
         ax.set_ylim(0, self.L)
 
         if bar:
@@ -197,15 +200,30 @@ class Cell(Dump):
                 sm.set_array([])
                 cbar = plt.colorbar(sm, cax=cax, orientation  = "horizontal")
                 cbar.set_label(prop)
-                fig.set_size_inches(4*l, 5.2)
+                fig.set_size_inches(4*l, 5.2*1.1)
             else:
                 norm = Normalize(vmin=np.min(C), vmax=np.max(C))
                 sm = ScalarMappable(cmap=colormap, norm=norm)
                 sm.set_array([])
                 
                 cbar.update_normal(sm)
+        if quant != None:
+            if axval is None:
+                divider = make_axes_locatable(ax)
+                axval = divider.append_axes("top", size="10%", pad=0.05)
+                # get fig actual size
+                a, b = fig.get_size_inches()
+                fig.set_size_inches(a, b*1.3)
+                axval.set_xlim(0, len(self.i))
+                axval.set_xticks([])
+            if axval is not None:
+                axval.clear()
+                axval.plot(self.i[:frame], self.shear[:frame])
+                axval.set_xlim(0, len(self.i))
+                axval.set_ylim(np.min(self.shear), np.max(self.shear))
+                axval.set_xticks([])
         
-    def batch(self, prop, start, end, step, cmap="cmasher:viola", shear = True, bar = True):
+    def batch(self, prop, start, end, step, cmap="cmasher:viola", shear = True, bar = True, quant = None):
         
         os.makedirs(self.path + f'batch_{prop}', exist_ok = True)
         if shear:
@@ -223,15 +241,15 @@ class Cell(Dump):
             last = end
         for i in range(start, last, step):
             print(i, "/", last)
-            self.voronoi(i, prop, cmap, fig = fig, ax = ax, shear = shear, bar = bar)
+            self.voronoi(i, prop, cmap, fig = fig, ax = ax, shear = shear, bar = bar, quant = quant)
             plt.savefig(self.path + f'batch_{prop}/{count:04}.png', pad_inches = 0.1, bbox_inches=None)
             ax.clear()
             count += 1
         plt.close()
         
-    def save(self, prop, start = 0, end = -1, step = 1, frame_rate = 10, cmap="cmasher:viola", shear = True, bar = True, overide = False):
+    def save(self, prop, start = 0, end = -1, step = 1, frame_rate = 10, cmap="cmasher:viola", shear = True, bar = True, overide = False, quant = None):
         if not os.path.exists(self.path + f'batch_{prop}') or overide:
-            self.batch(prop, start, end, step, cmap = cmap, shear = shear, bar = bar)
+            self.batch(prop, start, end, step, cmap = cmap, shear = shear, bar = bar, quant = quant)
         if True:
             inp = self.path + fr'batch_{prop}/*'
             output_video = self.path + f'batch_{prop}.gif'
@@ -240,7 +258,7 @@ class Cell(Dump):
             for i in sorted(glob(inp)):
                 images.append(imageio.imread(i))
             
-            imageio.mimsave(output_video, images, fps=frame_rate)
+            imageio.mimsave(output_video, images, fps=frame_rate, loop = 0)
         else:
             input_pattern = self.path + fr'batch_{prop}/%04d.png' 
             output_video = self.path + f'batch_{prop}.gif'
@@ -254,12 +272,12 @@ class Cell(Dump):
             ]
             subprocess.run(ffmpeg_cmd, check=True)
 
-if 0:      
+if 1:      
 
-    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.850000gamma_0.500000gammarate_0.100000Ka_0.000000v_3202.dump")
-    #a.voronoi(frame = 15, shear = False, prop = "shear")
+    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.650000gamma_2.000000gammarate_0.001000Ka_1.000000v_2.dump")
+    a.voronoi(frame = -1, shear = True)
     'cmasher:pepper'
-    a.save("shear", cmap ='jet', bar = True, shear = True, overide=False, frame_rate = 3)
+    #a.save("shear", cmap ='jet', bar = True, shear = True, overide=False, frame_rate = 20, quant = True)
 
 if 0:
     files = glob("dump2/*.dump")
