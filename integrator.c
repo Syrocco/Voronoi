@@ -8,6 +8,9 @@
 #include <time.h>
 #include <omp.h>
 
+#define STAY_IN_LOCAL_MINIMA 1
+
+
 #define TIME_FUNCTION(func, ...) \
     do { \
         clock_t start_time = clock(); \
@@ -20,18 +23,17 @@
 
 void eulerStep(data* sys){
 
-
     //TIME_FUNCTION(jcv_diagram_generate,sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     
     loggers(sys);
-    
-    shear(sys);
 
     //TIME_FUNCTION(compute_force, sys);
     compute_force(sys);
     
+    //Shear applied after the force.
+    shear(sys);
     sys->N_pbc = sys->N;
     jcv_real forcex = 0;
     jcv_real forcey = 0;
@@ -59,14 +61,246 @@ void eulerStep(data* sys){
         //printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
         //exit(3);
     }
-
 }
 
 
-jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, double alpha, double rho, double c){
+void rk4Step(data* sys) {
+    jcv_point k1[sys->N], k2[sys->N], k3[sys->N], k4[sys->N];
+    jcv_point initial_positions[sys->N];
+
+    for (int i = 0; i < sys->N; i++) {
+        initial_positions[i] = sys->positions[i];
+    }
+
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    loggers(sys);
+
+
+    // Compute k1 ------------------------
+
+    compute_force(sys);
+    for (int i = 0; i < sys->N; i++) {
+        k1[i].x = sys->dt * sys->forces[i].x;
+        k1[i].y = sys->dt * sys->forces[i].y;
+    }
+    // ###################################
+
+    // Compute k2 ------------------------
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + 0.5 * k1[i].x;
+        sys->positions[i].y = initial_positions[i].y + 0.5 * k1[i].y;
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    compute_force(sys);
+    for (int i = 0; i < sys->N; i++) {
+        k2[i].x = sys->dt * sys->forces[i].x;
+        k2[i].y = sys->dt * sys->forces[i].y;
+    }
+    // ###################################
+
+    // Compute k3 ------------------------
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + 0.5 * k2[i].x;
+        sys->positions[i].y = initial_positions[i].y + 0.5 * k2[i].y;
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    compute_force(sys);
+    for (int i = 0; i < sys->N; i++) {
+        k3[i].x = sys->dt * sys->forces[i].x;
+        k3[i].y = sys->dt * sys->forces[i].y;
+    }
+    // ###################################
+
+    // Compute k4 ------------------------
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + k3[i].x;
+        sys->positions[i].y = initial_positions[i].y + k3[i].y;
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    compute_force(sys);
+    for (int i = 0; i < sys->N; i++) {
+        k4[i].x = sys->dt * sys->forces[i].x;
+        k4[i].y = sys->dt * sys->forces[i].y;
+    }
+    // ###################################
+
+    // Update positions
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + (k1[i].x + 2 * k2[i].x + 2 * k3[i].x + k4[i].x) / 6.0;
+        sys->positions[i].y = initial_positions[i].y + (k1[i].y + 2 * k2[i].y + 2 * k3[i].y + k4[i].y) / 6.0;
+        if (sys->i - sys->shear_start >= 0){
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+        }
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+
+    shear(sys);
+}
+
+void rkf45Step(data* sys) {
+    jcv_point k1[sys->N], k2[sys->N], k3[sys->N], k4[sys->N], k5[sys->N], k6[sys->N];
+    jcv_point initial_positions[sys->N];
+    jcv_real error, dt_new;
+    const jcv_real tolerance = 1e-4;
+    const jcv_real safety = 0.9;
+    const jcv_real min_dt = 1e-10;
+    const jcv_real max_dt = 1.0;
+
+    for (int i = 0; i < sys->N; i++) {
+        initial_positions[i] = sys->positions[i];
+    }
+
+    do {
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        loggers(sys);
+
+        // Compute k1
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k1[i].x = sys->dt * sys->forces[i].x;
+            k1[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Compute k2
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = initial_positions[i].x + 0.25 * k1[i].x;
+            sys->positions[i].y = initial_positions[i].y + 0.25 * k1[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k2[i].x = sys->dt * sys->forces[i].x;
+            k2[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Compute k3
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = initial_positions[i].x + (3.0 / 32.0) * k1[i].x + (9.0 / 32.0) * k2[i].x;
+            sys->positions[i].y = initial_positions[i].y + (3.0 / 32.0) * k1[i].y + (9.0 / 32.0) * k2[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k3[i].x = sys->dt * sys->forces[i].x;
+            k3[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Compute k4
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = initial_positions[i].x + (1932.0 / 2197.0) * k1[i].x - (7200.0 / 2197.0) * k2[i].x + (7296.0 / 2197.0) * k3[i].x;
+            sys->positions[i].y = initial_positions[i].y + (1932.0 / 2197.0) * k1[i].y - (7200.0 / 2197.0) * k2[i].y + (7296.0 / 2197.0) * k3[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k4[i].x = sys->dt * sys->forces[i].x;
+            k4[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Compute k5
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = initial_positions[i].x + (439.0 / 216.0) * k1[i].x - 8.0 * k2[i].x + (3680.0 / 513.0) * k3[i].x - (845.0 / 4104.0) * k4[i].x;
+            sys->positions[i].y = initial_positions[i].y + (439.0 / 216.0) * k1[i].y - 8.0 * k2[i].y + (3680.0 / 513.0) * k3[i].y - (845.0 / 4104.0) * k4[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k5[i].x = sys->dt * sys->forces[i].x;
+            k5[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Compute k6
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = initial_positions[i].x - (8.0 / 27.0) * k1[i].x + 2.0 * k2[i].x - (3544.0 / 2565.0) * k3[i].x + (1859.0 / 4104.0) * k4[i].x - (11.0 / 40.0) * k5[i].x;
+            sys->positions[i].y = initial_positions[i].y - (8.0 / 27.0) * k1[i].y + 2.0 * k2[i].y - (3544.0 / 2565.0) * k3[i].y + (1859.0 / 4104.0) * k4[i].y - (11.0 / 40.0) * k5[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        for (int i = 0; i < sys->N; i++) {
+            k6[i].x = sys->dt * sys->forces[i].x;
+            k6[i].y = sys->dt * sys->forces[i].y;
+        }
+
+        // Estimate error
+        error = 0.0;
+        for (int i = 0; i < sys->N; i++) {
+            jcv_real err_x = (1.0 / 360.0) * k1[i].x - (128.0 / 4275.0) * k3[i].x - (2197.0 / 75240.0) * k4[i].x + (1.0 / 50.0) * k5[i].x + (2.0 / 55.0) * k6[i].x;
+            jcv_real err_y = (1.0 / 360.0) * k1[i].y - (128.0 / 4275.0) * k3[i].y - (2197.0 / 75240.0) * k4[i].y + (1.0 / 50.0) * k5[i].y + (2.0 / 55.0) * k6[i].y;
+            error += err_x * err_x + err_y * err_y;
+        }
+        error = sqrt(error / sys->N);
+
+        // Adjust timestep
+        dt_new = safety * sys->dt * pow(tolerance / error, 0.2);
+        if (dt_new < min_dt) dt_new = min_dt;
+        if (dt_new > max_dt) dt_new = max_dt;
+
+        if (error > tolerance) {
+            sys->dt = dt_new;
+            for (int i = 0; i < sys->N; i++) {
+                sys->positions[i] = initial_positions[i];
+            }
+        }
+    } while (error > tolerance);
+
+    // Update positions
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + (16.0 / 135.0) * k1[i].x + (6656.0 / 12825.0) * k3[i].x + (28561.0 / 56430.0) * k4[i].x - (9.0 / 50.0) * k5[i].x + (2.0 / 55.0) * k6[i].x;
+        sys->positions[i].y = initial_positions[i].y + (16.0 / 135.0) * k1[i].y + (6656.0 / 12825.0) * k3[i].y + (28561.0 / 56430.0) * k4[i].y - (9.0 / 50.0) * k5[i].y + (2.0 / 55.0) * k6[i].y;
+        if (sys->i - sys->shear_start >= 0){
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+        }
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+
+    shear(sys);
+    sys->dt = dt_new; // Update the timestep for the next iteration
+    printf("%f\n", sys->dt);
+}
+
+// Line search with backtracking and goldstein-armijo condition
+jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, jcv_real alpha, jcv_real rho, jcv_real c){
     jcv_point x_old[sys->N];
 
-    double dot_product = 0.0;
+    jcv_real dot_product = 0.0;
 
     jcv_real old_energy = energy_total(sys);
 
@@ -75,7 +309,8 @@ jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, doubl
         x_old[i] = sys->positions[i];
         dot_product += jcv_dot(gradient[i], direction[i]);
     }
-    //dot_product /= sys->N;
+
+    // If going uphill, change direction to -gradient (pure gradient descent)
     if (dot_product > 0){
         dot_product = 0;
         for (int i = 0; i < sys->N; i++) {
@@ -99,9 +334,62 @@ jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, doubl
         //printf("new_energy = %.9lf, old_energy = %.9lf, alpha = %.9lf\n", new_energy, old_energy, alpha);
 
         if (new_energy <= old_energy + c * alpha * dot_product) {
-            break;  // Stop if condition is satisfied
+            //printf("new_energy = %.9lf\n", new_energy);
+            break;  // Stop if a Armijo condition is satisfied
         }
         alpha *= rho;  // Reduce step size
+    }
+    return alpha;
+}
+
+// Custom mine search with backtracking and goldstein-armijo condition, as well as trying to say in the local minima.
+jcv_real line_search_local_minima(data* sys, jcv_point* gradient, jcv_point *direction, jcv_real alpha, jcv_real rho, jcv_real c){
+    int can_increase = 1;
+    jcv_point x_old[sys->N];
+
+    jcv_real dot_product = 0.0;
+
+    jcv_real old_energy = energy_total(sys);
+
+    // Compute dot product of gradient and search direction
+    for (int i = 0; i < sys->N; i++) {
+        x_old[i] = sys->positions[i];
+        dot_product += jcv_dot(gradient[i], direction[i]);
+    }
+
+    // If going uphill, change direction to -gradient (pure gradient descent)
+    if (dot_product > 0){
+        dot_product = 0;
+        for (int i = 0; i < sys->N; i++) {
+            direction[i] = sys->forces[i];
+            dot_product += jcv_dot(gradient[i], direction[i]);
+        }
+    }
+
+    while (1) {
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = x_old[i].x + alpha*direction[i].x;
+            sys->positions[i].y = x_old[i].y + alpha*direction[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        jcv_real new_energy = energy_total(sys);
+        //printf("new_energy = %.9lf, old_energy = %.9lf, alpha = %.9lf\n", new_energy, old_energy, alpha);
+        int validity_test = new_energy <= old_energy + c * alpha * dot_product;
+        if (validity_test && can_increase == 0) {
+            break;  // Stop if a Armijo condition is satisfied
+        }
+        else if (validity_test && can_increase == 1){
+            alpha /= rho; //Start with small alpha, increases it while the energy decreases
+        }
+        else if (validity_test == 0){ //Then do regular backtracking
+            can_increase = 0;
+            alpha *= rho;  // Reduce step size
+        }
     }
     return alpha;
 }
@@ -109,10 +397,9 @@ jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, doubl
 void conjugateGradientStep(data* sys) {
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
+    loggers(sys);
 
     compute_force(sys);
-
-    loggers(sys);
 
     jcv_real chi = 0.0;
     jcv_point gradient[sys->N];
@@ -126,19 +413,40 @@ void conjugateGradientStep(data* sys) {
 
     
 
-    int count = 0;
-    while (1) {
-        count++;
-        line_search(sys, gradient, delta, 1, 0.5, 0.0001);
+    #if STAY_IN_LOCAL_MINIMA
+    jcv_real alpha = 0.2;
+    #else
+    jcv_real alpha = 1;
+    #endif
 
+    jcv_real new_gnorm = 0.0;
+    jcv_real old_gnorm = 0.0;
+    int count = 0;
+    while (1){
+
+        #if STAY_IN_LOCAL_MINIMA
+        alpha = line_search_local_minima(sys, gradient, delta, alpha, 0.5, 0.0001);
+        #else
+        line_search(sys, gradient, delta, alpha, 0.2, 0.0001);
+        #endif
         compute_force(sys);
-        jcv_real gnorm = 0.0;
+        new_gnorm = 0;
         for (int i = 0; i < 2 * sys->N; i++) {
-            gnorm += jcv_lenght_sq(&sys->forces[i]);
+            new_gnorm += jcv_lenght_sq(&sys->forces[i]);
         }
-        gnorm = JCV_SQRT(gnorm/sys->N);
-        //printf("gnorm = %.14lf\n", gnorm);
-        if (gnorm < 1e-6) {
+        new_gnorm = JCV_SQRT(new_gnorm/sys->N);
+        //printf("gnorm = %.14lf\n", new_gnorm);
+
+        // Add counter because force is wrong due to T1s.
+        if (jcv_abs(new_gnorm - old_gnorm) < 1e-10){
+            count++;
+        }
+        else{
+            count = 0;
+        }
+
+
+        if (new_gnorm < 1e-8 || count > 3) {
             break;
         }
         else{
@@ -156,8 +464,10 @@ void conjugateGradientStep(data* sys) {
                 delta[i].y = sys->forces[i].y + chi*delta[i].y;
             }
         }
+        old_gnorm = new_gnorm;
         //saveTXT(sys);
     }
+
     shear(sys);
     if (sys->i - sys->shear_start >= 0) {
         sys->N_pbc = sys->N;
@@ -224,15 +534,24 @@ void fireStep(data* sys){
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
         if (count > 2500){
-            if (fnorm > 0.01)
-                dt_now = dt_max*1.5;
             printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf, E = %lf\n", fnorm, vnorm, P, dt_now, energy_total(sys));
+            if (fnorm > 0.0001){
+                alpha_now = 1;
+                dt_now = 0.001;
+                P = 1;
+                vnorm = 1;
+                fnorm = 1; 
+            }
+            
             //saveTXT(sys);
-            if (count > 20000){
+            
+            if (count > 200000){
                 printf("Failed to converge\n");
                 unexpectedClosure(sys);
                 exit(3);
-            } 
+            }
+            //check_force(sys);
+            //exit(3); 
         }
 
 
@@ -259,7 +578,7 @@ void fireStep(data* sys){
             }
         }
         sys->N_pbc = sys->N;
-        for (int i = 0; i < sys->N; i++) {
+        for (int i = 0; i < sys->N; i++){
             sys->positions[i].x += dt_now*sys->velocities[i].x;
             sys->positions[i].y += dt_now*sys->velocities[i].y;
             pbc(&sys->positions[i], sys->L, sys->gamma);

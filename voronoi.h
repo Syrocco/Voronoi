@@ -38,6 +38,7 @@ struct logger_snapshot_{
 struct memory_{
     jcv_point* old_positions_thermo;
     jcv_point* old_positions_snapshot;
+    jcv_point* old_positions_strobo;
     int new;
 };
 
@@ -81,6 +82,7 @@ struct data_
     
     logger_thermo info_thermo;
     logger_snapshot info_snapshot;
+    logger_thermo info_strobo;
 
     memory old_info;
 };

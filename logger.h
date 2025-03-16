@@ -8,6 +8,7 @@ void loggers(data* sys);
 
 void saveTXT(data* sys);
 void computeThermo(data* sys);
+void computeStrobo(data* sys);
 void write(FILE* file, const char* filename, const jcv_point* points, const jcv_site* sites, int N, int N_pbc);
 void unexpectedClosure(data* sys);
 

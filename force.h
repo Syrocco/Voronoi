@@ -14,5 +14,5 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
 
 void compute_force(data* sys);
 
-
+void check_force(data* sys);
 #endif

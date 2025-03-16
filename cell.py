@@ -28,10 +28,13 @@ class Cell(Dump):
             self.path = path = loc.split(".dump")[0]
         except:
             self.path = path = loc.split(".thermo")[0]
+            
         if loc[-1] == "o":
             path = loc
         else:
             path = self.path + ".thermo"
+            
+            
         with open(path, 'r') as file:
             try:
                 first_line = file.readline().strip()
@@ -48,6 +51,36 @@ class Cell(Dump):
                     setattr(self, col_name, data[:, i])
             except:
                 print("could not recover .thermo")
+                
+        if loc[-1] == "b":
+            path = loc
+        else:
+            path = self.path + ".strob"
+            
+            
+        with open(path, 'r') as file:
+            try:
+                first_line = file.readline().strip()
+                column_names = first_line.split()
+                if column_names[0] == "i":
+                    try:
+                        data = np.loadtxt(path, skiprows = 1)
+                    except:
+                        data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+        
+                    if data.ndim == 1:
+                        data = data.reshape(1, -1)
+        
+                    for i, col_name in enumerate(column_names):
+                        setattr(self, "s_"+col_name, data[:, i])
+                else:
+                    data = np.loadtxt(path)
+                    self.s_E = data[:, 1]
+                    self.s_i = data[:, 0]
+                    self.shear = data[:, 3]
+                    self.frac_active = data[:, 4]
+            except:
+                print("could not recover .strob")
     def extract_variables(self):
         # Define the pattern to match variable names and values
         pattern = r'(\w+?)_(\d*\.?\d+)'
@@ -274,10 +307,10 @@ class Cell(Dump):
 
 if 1:      
 
-    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.650000gamma_2.000000gammarate_0.001000Ka_1.000000v_2.dump")
-    a.voronoi(frame = -1, shear = True)
+    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.550000gamma_3.000000gammarate_0.010000Ka_0.000000v_1.dump")
+    #a.voronoi(frame = -1, shear = False)
     'cmasher:pepper'
-    #a.save("shear", cmap ='jet', bar = True, shear = True, overide=False, frame_rate = 20, quant = True)
+    a.save("shear", cmap ='jet', start = 2000, end = 2100, bar = False, shear = True, overide=False, frame_rate = 20, quant = None)
 
 if 0:
     files = glob("dump2/*.dump")

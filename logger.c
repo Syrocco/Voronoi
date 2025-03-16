@@ -16,12 +16,15 @@ void loggers(data* sys){
         computeThermo(sys);
     }
 
+    if ((sys->i - sys->info_strobo.n_start)%(sys->info_strobo.n_log) == 0 
+         && sys->i >= sys->info_strobo.n_start){
+        computeStrobo(sys);
+    }
+
 }
 
 void computeThermo(data* sys){
     
-    
-
     jcv_real E = energy_total(sys)/sys->N;
     fprintf(sys->info_thermo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
     printf("i = %d, E = %lf, γ = %lf ", sys->i, E, sys->gamma);
@@ -57,6 +60,39 @@ void computeThermo(data* sys){
     fflush(sys->info_thermo.file);    
 }
 
+void computeStrobo(data* sys){
+    
+    jcv_real E = energy_total(sys)/sys->N;
+    fprintf(sys->info_strobo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
+
+    if (sys->info_strobo.compute_stress){
+        jcv_real stress[2][2];
+        stress_total(sys, stress);
+        jcv_real shear_stress = (stress[0][1] + stress[1][0])/2;
+        jcv_real pressure = (stress[0][0] + stress[1][1])/2;
+        fprintf(sys->info_strobo.file, "%lf %lf ", pressure, shear_stress);
+    }
+    
+    if (sys->info_strobo.compute_dist_travelled){
+        jcv_real frac_active = 0;
+        jcv_real distance_move[sys->N];
+        distance_moved(sys, sys->old_info.old_positions_strobo, distance_move);
+        for (int i = 0; i < sys->N; i++){
+            if (distance_move[i] > 0.001){
+                frac_active++;
+            }
+        }
+        frac_active = frac_active/sys->N;
+        fprintf(sys->info_strobo.file, "%lf ", frac_active);
+        if (frac_active == 0){
+            printf("No more active particles");
+            exit(3);
+        } 
+    }
+    fprintf(sys->info_strobo.file, "\n");
+    fflush(sys->info_strobo.file);    
+}
+
 void saveTXT(data* sys){
     FILE* file = sys->info_snapshot.file;
     jcv_real gamma = sys->gamma;
@@ -64,6 +100,7 @@ void saveTXT(data* sys){
     jcv_point* p = sys->positions;
     jcv_point* f = sys->forces;
     jcv_point* v = sys->velocities;
+    jcv_real* a = sys->prefered_area;
     int N = sys->N;
     int m = sys->i;
     int N_pbc = sys->N_pbc;
@@ -77,7 +114,7 @@ void saveTXT(data* sys){
 
  
 
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%f %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id x y vx vy fx fy ", m, NN, fmin(0, dL), fmax(L, L + dL), dL, L);
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%f %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id prefered_area x y vx vy fx fy ", m, NN, fmin(0, dL), fmax(L, L + dL), dL, L);
     if (sys->info_snapshot.compute_stress){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){
@@ -107,7 +144,7 @@ void saveTXT(data* sys){
     
     for(int i = 0; i < NN; i++){
         if (i >= N){
-            fprintf(file, "%d %lf %lf nan nan nan nan ", i, p[i].x, p[i].y);
+            fprintf(file, "%d %lf %lf %lf nan nan nan nan ", i, a[i], p[i].x, p[i].y);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "nan ");
             }
@@ -123,7 +160,7 @@ void saveTXT(data* sys){
             fprintf(file, "\n");
         }
         else{
-            fprintf(file, "%d %lf %lf %.16lf %.16lf %.16lf %.16lf ", i, p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
+            fprintf(file, "%d %lf %lf %lf %.16lf %.16lf %.16lf %.16lf ", i, a[i], p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "%lf ", (stress[i][0][1] + stress[i][1][0])/2);
             }

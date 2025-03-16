@@ -12,8 +12,8 @@
 #include "integrator.h"
 #include <getopt.h>
 #include <errno.h>
-
-
+#include "thermo.h"
+jcv_real energyUnique(data* sys, const parameter* param, int num_particle);
 int main(int argc, char *argv[]){
     init_genrand(0);
 
@@ -26,17 +26,17 @@ int main(int argc, char *argv[]){
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 100000; 
-    sys.dt = 1;
+    sys.M = 1000000; 
+    sys.dt = 0.1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.1;
-    sys.gamma_max = 3;
+    sys.parameter.gamma_rate = 0.01;
+    sys.gamma_max = 0.2;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
-    sys.shear_cycle = 0;
+    sys.shear_cycle = 1;
 
     sys.info_snapshot.n_log = 1;
-    sys.info_snapshot.n_start = -1;
+    sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
@@ -46,7 +46,11 @@ int main(int argc, char *argv[]){
     sys.info_thermo.n_log = 1;
     sys.info_thermo.n_start = 0;
     sys.info_thermo.compute_stress = 1;
-    sys.info_thermo.compute_dist_travelled = 1;
+    sys.info_thermo.compute_dist_travelled = 0;
+
+    sys.info_strobo.compute_stress = 1;
+    sys.info_strobo.compute_dist_travelled = 0;
+
     
     constantInit(argc, argv, &sys);
     
@@ -62,27 +66,34 @@ int main(int argc, char *argv[]){
     sys.forces = forces;
     sys.prefered_area = prefered_area;
     
+
     jcv_point old_positions1[sys.N];
     sys.old_info.old_positions_thermo = old_positions1;
+
     jcv_point old_positions2[sys.N];
     sys.old_info.old_positions_snapshot = old_positions2;
 
+    jcv_point old_positions3[sys.N];
+    sys.old_info.old_positions_strobo = old_positions3;
+
 
     //randomInitial(&sys);
-    //distribute_area(&sys);
-    //rsaInitial(&sys, 0.4);
-    read_from_dump_initial(&sys, "dump/N_300qo_3.650000gamma_3.000000gammarate_0.100000Ka_1.000000v_16.dump", 0);
+    distribute_area(&sys);
+    rsaInitial(&sys, 0.4);
+    //read_from_dump_initial(&sys, "dump/N_300qo_3.650000gamma_3.000000gammarate_0.100000Ka_1.000000v_16.dump", 0);
 
-    
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
-        
+        rkf45Step(&sys);
+        //rk4Step(&sys);
         //eulerStep(&sys);
         //fireStep(&sys);
-        conjugateGradientStep(&sys);
+        //conjugateGradientStep(&sys);
         
     }
     
+    //check_force(&sys);
+
 	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
@@ -206,8 +217,8 @@ void constantInit(int argc, char *argv[], data* sys){
         sys->info_snapshot.n_start = sys->shear_start;
     }
 
-    if (sys->info_snapshot.n_log == -1){
-        sys->info_snapshot.n_log = 4*sys->n_to_shear_max; //need 2*n_to_shear_max to get the full cycle
+    if (sys->info_snapshot.n_log < 0){
+        sys->info_snapshot.n_log = -4*sys->n_to_shear_max/sys->info_snapshot.n_log; //need 2*n_to_shear_max to get the full cycle
     }
 
     if (sys->info_thermo.n_start == -1){
@@ -218,19 +229,32 @@ void constantInit(int argc, char *argv[], data* sys){
         sys->info_thermo.n_log = 4*sys->n_to_shear_max;
     }
 
-    if ((sys->shear_cycle == 0) && (sys->shear_start != INT32_MAX)){
+    if (sys->shear_cycle == 0 && sys->shear_start != INT32_MAX){
         sys->M = sys->shear_start + sys->n_to_shear_max;
     }
+    else if (sys->shear_cycle == 1 && sys->shear_start != INT32_MAX){
+        sys->info_strobo.n_log = 4*sys->n_to_shear_max;
+        sys->info_strobo.n_start = sys->shear_start;
+    }
+    else if (sys->shear_start == INT32_MAX){
+        sys->info_strobo.n_log = INT32_MAX;
+        sys->info_strobo.n_start = INT32_MAX;
+    }
 
-	char filename[256];
+	char filename[200];
     do {
-        sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d.dump", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
-        sys->info_snapshot.file = fopen(filename, "wx");
+        sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
+        char snapshot_filename[256], thermo_filename[256], strobo_filename[256];
+        sprintf(snapshot_filename, "%s.dump", filename);
+        sprintf(thermo_filename, "%s.thermo", filename);
+        sprintf(strobo_filename, "%s.strob", filename);
+
+        sys->info_snapshot.file = fopen(snapshot_filename, "wx");
         if (sys->info_snapshot.file == NULL && errno == EEXIST) {
             version++;
         } else {
-            sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d.thermo", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
-            sys->info_thermo.file = fopen(filename, "wx");
+            sys->info_thermo.file = fopen(thermo_filename, "wx");
+            sys->info_strobo.file = fopen(strobo_filename, "wx");
             break;
         }
     } while (1);
@@ -243,5 +267,14 @@ void constantInit(int argc, char *argv[], data* sys){
         fprintf(sys->info_thermo.file, "frac_active ");
     }
     fprintf(sys->info_thermo.file, "\n");
+
+    fprintf(sys->info_strobo.file, "i E gamma_actual ");
+    if (sys->info_strobo.compute_stress){
+        fprintf(sys->info_strobo.file, "P shear ");
+    }
+    if (sys->info_strobo.compute_dist_travelled){
+        fprintf(sys->info_strobo.file, "frac_active ");
+    }
+    fprintf(sys->info_strobo.file, "\n");
 }
 

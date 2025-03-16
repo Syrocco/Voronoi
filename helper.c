@@ -199,6 +199,7 @@ void pbc_distance(jcv_point* dr, jcv_real L){
         dr->y += L;
     }
 }
+
 //Box Muller gaussian number generator
 void gaussian(jcv_real* n1, jcv_real* n2){
     jcv_real u1 = drand(0, 1);
