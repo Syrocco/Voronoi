@@ -1,12 +1,6 @@
 # Voronoi
 
-This code implements a molecular dynamics simulation of points based on their Voronoi diagram. The code includes functions to generate Voronoi diagrams using [jcv_voronoi](https://github.com/JCash/voronoi), compute forces, and calculate energy based on the Voronoi cells.
-
-## Files
-
-- `voronoi.c` and `voronoi.h`: Main file that initializes the system and runs the simulation.
-- `helper.c` and `helper.h`: Helper functions used throughout the project.
-- `force.c` and `force.h`: Functions to compute forces based on the Voronoi cells.
+This code implements a molecular dynamics simulation of points based on their Voronoi diagram. The code includes functions to generate Voronoi diagrams using [jcv_voronoi](https://github.com/JCash/voronoi), compute forces, and calculate energy based on the Voronoi cells. It can perform energy minimization through FIRE or Conjugate Gradient or overdamped dynamics through RK4, RK45 with an adaptative timestep or euler.
 
 ## Compilation
 
@@ -46,4 +40,4 @@ This will execute the Voronoi diagram generation and related computations as def
 Ensure you have the following dependencies installed:
 - GCC
 - Make
-
+- Openmp (optional)
