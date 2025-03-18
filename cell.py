@@ -24,9 +24,9 @@ class Cell(Dump):
             Dump.__init__(self, loc)
         self.extract_variables()
         self.L = np.sqrt(self.N)
-        try:
+        if "dump" in loc:
             self.path = path = loc.split(".dump")[0]
-        except:
+        else:
             self.path = path = loc.split(".thermo")[0]
             
         if loc[-1] == "o":
@@ -57,7 +57,7 @@ class Cell(Dump):
         else:
             path = self.path + ".strob"
             
-            
+
         with open(path, 'r') as file:
             try:
                 first_line = file.readline().strip()
@@ -66,7 +66,13 @@ class Cell(Dump):
                     try:
                         data = np.loadtxt(path, skiprows = 1)
                     except:
-                        data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+                        try:
+                            data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+                        except:
+                            try:
+                                data = np.loadtxt(path, skip_footer = 2, skiprows = 1)
+                            except:
+                                pass
         
                     if data.ndim == 1:
                         data = data.reshape(1, -1)
@@ -77,8 +83,8 @@ class Cell(Dump):
                     data = np.loadtxt(path)
                     self.s_E = data[:, 1]
                     self.s_i = data[:, 0]
-                    self.shear = data[:, 3]
-                    self.frac_active = data[:, 4]
+                    self.s_shear = data[:, 4]
+                    self.s_frac_active = data[:, 5]
             except:
                 print("could not recover .strob")
     def extract_variables(self):
@@ -100,7 +106,66 @@ class Cell(Dump):
         # Assign values to variables with the same names
         for name, value in variables.items():
             setattr(self, name, value)
-    def pbc(self,frame = -1, prop = None):
+    def unwrap(self, start = 0):
+        X = []
+        Y = []
+        
+        for i in range(start, self.nframes):
+            self.jump_to_frame(i)
+            X.append(self.get_atompropf("x"))
+            Y.append(self.get_atompropf("y"))
+        
+        X = np.array(X)
+        Y = np.array(Y)
+        count_x = np.zeros_like(X)
+        count_y = np.zeros_like(Y)
+        DX = np.diff(X, axis = 0)
+        DY = np.diff(Y, axis = 0)
+        
+        for i in range(1, len(X)):
+            count_x[i] = count_x[i - 1] - (DX[i - 1] > self.L/2).astype(int) + (DX[i - 1] < -self.L/2).astype(int)
+            count_y[i] = count_y[i - 1] - (DY[i - 1] > self.L/2).astype(int) + (DY[i - 1] < -self.L/2).astype(int)
+        
+        return X + self.L*count_x, Y + self.L*count_y
+      
+    def msd(self, start=0, max_lag=None, dim='both'):
+        X, Y = self.unwrap(start)
+        
+        n_frames = X.shape[0]
+        n_particles = X.shape[1]
+        
+        if max_lag is None or max_lag >= n_frames:
+            max_lag = n_frames - 1
+        
+        # Prepare arrays
+        lags = np.arange(1, max_lag + 1)
+        msd_values = np.zeros(max_lag)
+        
+        # Calculate MSD for each lag
+        for lag in lags:
+            # Calculate displacements
+            if dim == 'x':
+                displacements = X[lag:] - X[:-lag]
+                squared_displacements = displacements**2
+            elif dim == 'y':
+                displacements = Y[lag:] - Y[:-lag]
+                squared_displacements = displacements**2
+            else:  # 'both'
+                displacements_x = X[lag:] - X[:-lag]
+                displacements_y = Y[lag:] - Y[:-lag]
+                squared_displacements = displacements_x**2 + displacements_y**2
+            
+            msd_values[lag-1] = np.mean(squared_displacements)
+        
+        return lags, msd_values
+    
+    def diffusivity(self, time, msd):
+        where = len(time)//5
+        sta = where
+        end = 2*where
+        return np.polyfit(time[sta:end], msd[sta:end], 1)[0]
+        
+    def pbc(self, frame = -1, prop = None):
         if frame < 0:
             frame = self.nframes + frame
         
@@ -305,47 +370,68 @@ class Cell(Dump):
             ]
             subprocess.run(ffmpeg_cmd, check=True)
 
-if 1:      
 
-    a = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.550000gamma_3.000000gammarate_0.010000Ka_0.000000v_1.dump")
-    #a.voronoi(frame = -1, shear = False)
+
+if 0:      
+
+    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.550000gamma_3.000000gammarate_0.010000Ka_0.100000v_1.dump")
+    cell.voronoi(frame = -2, shear = True)
     'cmasher:pepper'
-    a.save("shear", cmap ='jet', start = 2000, end = 2100, bar = False, shear = True, overide=False, frame_rate = 20, quant = None)
+    #a.save("shear", cmap ='jet', start = 2000, end = 2100, bar = False, shear = True, overide=False, frame_rate = 20, quant = None)
+
 
 if 0:
-    files = glob("dump2/*.dump")
-    cells = [Cell(file, False) for file in files]
-    gammarate = np.array(sorted(list(set([cell.gammarate for cell in cells]))))
+    cell = Cell("/mnt/ssd/Documents/Voronoi/data/absorbing/FIRE/N_300qo_3.700000gamma_0.673684gammarate_0.001000Ka_1.000000v_1.thermo", False)
+    plt.plot(cell.gamma_actual[-10000:], cell.shear[-10000:])
+    plt.xlabel(r"$\gamma$")
+    plt.ylabel(r"$\sigma_{xy}$")
+if 0:
+    files = glob("/mnt/ssd/Documents/Voronoi/data/absorbing/CG local/*.dump")
+    cells = [Cell(file) for file in files]
+    gammarate = np.array(sorted(list(set([round(cell.gammarate, 3) for cell in cells]))))
     gamma = np.array(sorted(list(set([cell.gamma for cell in cells]))))
     active = np.zeros((len(gamma), len(gammarate)))*np.nan
+    diffusivity = np.zeros((len(gamma), len(gammarate)))*np.nan
     time = np.zeros((len(gamma), len(gammarate)))*np.nan
     co = np.zeros((len(gamma), len(gammarate))).astype(str)
     marker = ["*", "s", "."]
-    for cell in cells:
+    for i, cell in enumerate(cells):
+        print(i, "/", len(cells))
         g = np.where(cell.gamma == gamma)[0][0]
-        G = np.where(cell.gammarate == gammarate)[0][0]
-        active[g, G] = cell.frac_active[-1]/300
-        time[g, G] = len(cell.frac_active)
-        if active[g, G] > 0.5:
-            co[g, G] = "red"
+        G = np.where(round(cell.gammarate, 3) == gammarate)[0][0]
+        if np.isnan(cell.E[-1]):
+            active[g, G] = np.nan
+            time[g, G] = np.nan
+            diffusivity[g, G] = np.nan
         else:
-            co[g, G] = "black"
+            a = cell.s_frac_active
+            active[g, G] = np.mean(a[-1])
+            time[g, G] = len(a[a>0.001])
+            """t, msd = cell.msd(cell.nframes//4)
+            diffusivity[g, G] = cell.diffusivity(t, msd)"""
         
-    plt.subplot(121)
+    plt.subplot(131)
     for i in range(len(gammarate)):
         plt.scatter(gamma, active[:, i], marker = marker[i], alpha = 0.7, label = gammarate[i])
     plt.legend(title = r"$\Delta \gamma$")
     plt.xlabel(r"$\gamma_{max}$")
     plt.ylabel(r"frac active")
-    plt.subplot(122)
+    plt.subplot(132)
     for i in range(len(gammarate)):
         plt.scatter(gamma, time[:, i], marker = marker[i], alpha = 0.7, label = gammarate[i], c = co[:, i])
     plt.legend(title = r"$\Delta \gamma$")
     plt.xlabel(r"$\gamma_{max}$")
     plt.ylabel(r"number of cycles")
+    plt.subplot(133)
+    for i in range(len(gammarate)):
+        plt.scatter(gamma, diffusivity[:, i], marker = marker[i], alpha = 0.7, label = gammarate[i], c = co[:, i])
+    plt.legend(title = r"$\Delta \gamma$")
+    plt.xlabel(r"$\gamma_{max}$")
+    plt.ylabel(r"diffusivity")
 
 if 0:
-    plt.plot(a.gamma_actual[1:], a.shear[1:])
+    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.550000gamma_0.200000gammarate_-0.000000Ka_3.000000v_2.dump", False)
+    plt.plot(cell.E)
+    plt.xscale("log")
+
     
-    plt.xlabel(r"$\gamma$")
-    plt.ylabel(r"$\sigma_{xy}$ (a.u)")

@@ -8,7 +8,7 @@
 #include <time.h>
 #include <omp.h>
 
-#define STAY_IN_LOCAL_MINIMA 1
+#define STAY_IN_LOCAL_MINIMA 0
 
 
 #define TIME_FUNCTION(func, ...) \
@@ -55,7 +55,7 @@ void eulerStep(data* sys){
         forcex += sys->forces[i].x;
         forcey += sys->forces[i].y;
     }
-
+    sys->time += sys->dt;
     
     if ((forcex*forcex + forcey*forcey)/sys->N > 0.00001){
         //printf("forcex = %.9lf, forcey = %.9lf \n", forcex, forcey);
@@ -63,6 +63,76 @@ void eulerStep(data* sys){
     }
 }
 
+void backwardEulerStep(data* sys) {
+    jcv_point initial_positions[sys->N];
+    jcv_real tolerance = 1e-6;
+    jcv_real error = 1.0;
+    int max_iterations = 50;
+    int iter = 0;
+    
+    // Generate initial Voronoi diagram and log data
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    loggers(sys);
+    
+    // Store initial positions
+    for (int i = 0; i < sys->N; i++) {
+        initial_positions[i] = sys->positions[i];
+    }
+    
+    // Initial guess using explicit Euler
+    compute_force(sys);
+    
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++) {
+        sys->positions[i].x = initial_positions[i].x + sys->dt * sys->forces[i].x;
+        sys->positions[i].y = initial_positions[i].y + sys->dt * sys->forces[i].y;
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+    
+    // Newton iterations to solve the implicit equation
+    while (error > tolerance && iter < max_iterations) {
+        // Compute forces at current position estimate
+        
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        
+        // Compute residual and update positions
+        error = 0.0;
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            // Residual: r = x - x_0 - h*f(x)
+            jcv_real rx = sys->positions[i].x - initial_positions[i].x - sys->dt * sys->forces[i].x;
+            jcv_real ry = sys->positions[i].y - initial_positions[i].y - sys->dt * sys->forces[i].y;
+            
+            // Update position (x_new = x - r)
+            sys->positions[i].x -= rx;
+            sys->positions[i].y -= ry;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+            
+            // Accumulate error
+            error += rx*rx + ry*ry;
+        }
+        error = sqrt(error / sys->N);
+        iter++;
+    }
+    
+    // Apply shear if needed
+    shear(sys);
+    sys->N_pbc = sys->N;
+    if (sys->i - sys->shear_start >= 0) {
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate * sys->dt * sys->positions[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+    }
+    
+    sys->time += sys->dt;
+}
 
 void rk4Step(data* sys) {
     jcv_point k1[sys->N], k2[sys->N], k3[sys->N], k4[sys->N];
@@ -138,18 +208,18 @@ void rk4Step(data* sys) {
     // ###################################
 
     // Update positions
+    shear(sys);
     sys->N_pbc = sys->N;
     for (int i = 0; i < sys->N; i++) {
         sys->positions[i].x = initial_positions[i].x + (k1[i].x + 2 * k2[i].x + 2 * k3[i].x + k4[i].x) / 6.0;
         sys->positions[i].y = initial_positions[i].y + (k1[i].y + 2 * k2[i].y + 2 * k3[i].y + k4[i].y) / 6.0;
-        if (sys->i - sys->shear_start >= 0){
-            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+        if (sys->i - sys->shear_start >= 0) {
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate * sys->dt * sys->positions[i].y;
         }
         pbc(&sys->positions[i], sys->L, sys->gamma);
         addBoundary(sys, i);
-    }
-
-    shear(sys);
+    } 
+    sys->time += sys->dt;
 }
 
 void rkf45Step(data* sys) {
@@ -165,18 +235,30 @@ void rkf45Step(data* sys) {
         initial_positions[i] = sys->positions[i];
     }
 
-    do {
-        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
-        sys->sites = jcv_diagram_get_sites(sys->diagram);
-        loggers(sys);
+    
+    jcv_real old_dt = sys->dt;
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    loggers(sys);
 
-        // Compute k1
-        compute_force(sys);
-        for (int i = 0; i < sys->N; i++) {
-            k1[i].x = sys->dt * sys->forces[i].x;
-            k1[i].y = sys->dt * sys->forces[i].y;
+    // Compute k1
+    compute_force(sys);
+    for (int i = 0; i < sys->N; i++) {
+        k1[i].x = sys->dt * sys->forces[i].x;
+        k1[i].y = sys->dt * sys->forces[i].y;
+    }
+
+    int count = 0;
+    do {
+        
+        if (count > 0){
+            for (int i = 0; i < sys->N; i++){
+                k1[i].x = k1[i].x/old_dt*sys->dt;
+                k1[i].y = k1[i].y/old_dt*sys->dt;
+            }
         }
 
+        count++;
         // Compute k2
         sys->N_pbc = sys->N;
         for (int i = 0; i < sys->N; i++) {
@@ -270,30 +352,25 @@ void rkf45Step(data* sys) {
         dt_new = safety * sys->dt * pow(tolerance / error, 0.2);
         if (dt_new < min_dt) dt_new = min_dt;
         if (dt_new > max_dt) dt_new = max_dt;
+        sys->dt = dt_new;
 
-        if (error > tolerance) {
-            sys->dt = dt_new;
-            for (int i = 0; i < sys->N; i++) {
-                sys->positions[i] = initial_positions[i];
-            }
-        }
     } while (error > tolerance);
 
+
     // Update positions
+    shear(sys);
     sys->N_pbc = sys->N;
     for (int i = 0; i < sys->N; i++) {
         sys->positions[i].x = initial_positions[i].x + (16.0 / 135.0) * k1[i].x + (6656.0 / 12825.0) * k3[i].x + (28561.0 / 56430.0) * k4[i].x - (9.0 / 50.0) * k5[i].x + (2.0 / 55.0) * k6[i].x;
         sys->positions[i].y = initial_positions[i].y + (16.0 / 135.0) * k1[i].y + (6656.0 / 12825.0) * k3[i].y + (28561.0 / 56430.0) * k4[i].y - (9.0 / 50.0) * k5[i].y + (2.0 / 55.0) * k6[i].y;
-        if (sys->i - sys->shear_start >= 0){
-            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate*sys->dt*sys->positions[i].y;
+        if (sys->i - sys->shear_start >= 0) {
+            sys->positions[i].x = sys->positions[i].x + sys->parameter.gamma_rate * sys->dt * sys->positions[i].y;
         }
         pbc(&sys->positions[i], sys->L, sys->gamma);
         addBoundary(sys, i);
     }
 
-    shear(sys);
-    sys->dt = dt_new; // Update the timestep for the next iteration
-    printf("%f\n", sys->dt);
+    sys->time += sys->dt;
 }
 
 // Line search with backtracking and goldstein-armijo condition
@@ -378,8 +455,8 @@ jcv_real line_search_local_minima(data* sys, jcv_point* gradient, jcv_point *dir
         jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
         sys->sites = jcv_diagram_get_sites(sys->diagram);
         jcv_real new_energy = energy_total(sys);
-        //printf("new_energy = %.9lf, old_energy = %.9lf, alpha = %.9lf\n", new_energy, old_energy, alpha);
-        int validity_test = new_energy <= old_energy + c * alpha * dot_product;
+        //printf("new_energy = %.16lf, old_energy = %.16lf, alpha = %.9lf\n", new_energy, old_energy, alpha);
+        int validity_test = new_energy <= old_energy + c*alpha*dot_product;
         if (validity_test && can_increase == 0) {
             break;  // Stop if a Armijo condition is satisfied
         }
@@ -397,9 +474,10 @@ jcv_real line_search_local_minima(data* sys, jcv_point* gradient, jcv_point *dir
 void conjugateGradientStep(data* sys) {
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
-    loggers(sys);
 
+    
     compute_force(sys);
+
 
     jcv_real chi = 0.0;
     jcv_point gradient[sys->N];
@@ -422,10 +500,10 @@ void conjugateGradientStep(data* sys) {
     jcv_real new_gnorm = 0.0;
     jcv_real old_gnorm = 0.0;
     int count = 0;
-    while (1){
 
+    while (1){
         #if STAY_IN_LOCAL_MINIMA
-        alpha = line_search_local_minima(sys, gradient, delta, alpha, 0.5, 0.0001);
+        alpha = line_search_local_minima(sys, gradient, delta, fmax(alpha, 1e-3), 0.5, 0.0001);
         #else
         line_search(sys, gradient, delta, alpha, 0.2, 0.0001);
         #endif
@@ -435,9 +513,9 @@ void conjugateGradientStep(data* sys) {
             new_gnorm += jcv_lenght_sq(&sys->forces[i]);
         }
         new_gnorm = JCV_SQRT(new_gnorm/sys->N);
-        //printf("gnorm = %.14lf\n", new_gnorm);
+        //printf("gnorm = %e, E = %.10e, alpha = %.10e\n", new_gnorm, energy_total(sys), alpha);
 
-        // Add counter because force is wrong due to T1s.
+        // Add counter because force is wrong
         if (jcv_abs(new_gnorm - old_gnorm) < 1e-10){
             count++;
         }
@@ -446,7 +524,12 @@ void conjugateGradientStep(data* sys) {
         }
 
 
-        if (new_gnorm < 1e-8 || count > 3) {
+        if (new_gnorm < 1e-8) {
+            break;
+        }
+        
+        if (count > 3){
+            //printf("gnorm = %e\n", new_gnorm);
             break;
         }
         else{
@@ -467,7 +550,8 @@ void conjugateGradientStep(data* sys) {
         old_gnorm = new_gnorm;
         //saveTXT(sys);
     }
-
+    
+    loggers(sys);
     shear(sys);
     if (sys->i - sys->shear_start >= 0) {
         sys->N_pbc = sys->N;
@@ -483,7 +567,6 @@ void fireStep(data* sys){
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
 
-    loggers(sys);
 
 
 
@@ -588,6 +671,10 @@ void fireStep(data* sys){
 
         
     } while (fnorm/sys->L > 1e-8); // L = sqrt((float)N)
+    
+    loggers(sys);
+
+
     shear(sys); 
     if (sys->i - sys->shear_start >= 0){
         sys->N_pbc = sys->N;

@@ -76,6 +76,7 @@ struct data_
     int M;
     int N_pbc; //N + number of boundary points
     int i;
+    jcv_real time;
 
     jcv_real n_frac_small;
     jcv_real size_large_over_small;

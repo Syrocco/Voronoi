@@ -26,8 +26,8 @@ void loggers(data* sys){
 void computeThermo(data* sys){
     
     jcv_real E = energy_total(sys)/sys->N;
-    fprintf(sys->info_thermo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
-    printf("i = %d, E = %lf, γ = %lf ", sys->i, E, sys->gamma);
+    fprintf(sys->info_thermo.file, "%d %lf %.16lf %lf ", sys->i, sys->time, E, sys->gamma);
+    printf("i = %d, dt = %lf, E = %.16lf, γ = %.12lf ", sys->i, sys->dt, E, sys->gamma);
 
     if (sys->info_thermo.compute_stress){
         jcv_real stress[2][2];
@@ -160,7 +160,7 @@ void saveTXT(data* sys){
             fprintf(file, "\n");
         }
         else{
-            fprintf(file, "%d %lf %lf %lf %.16lf %.16lf %.16lf %.16lf ", i, a[i], p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
+            fprintf(file, "%d %.16lf %.16lf %.16lf %.16lf %.16lf %.16lf %.16lf ", i, a[i], p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "%lf ", (stress[i][0][1] + stress[i][1][0])/2);
             }

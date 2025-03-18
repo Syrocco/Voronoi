@@ -26,17 +26,17 @@ int main(int argc, char *argv[]){
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 1000000; 
-    sys.dt = 0.1;
+    sys.M = 100000; 
+    sys.dt = 0.001;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.01;
+    sys.parameter.gamma_rate = 0.0;
     sys.gamma_max = 0.2;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
     sys.shear_cycle = 1;
 
-    sys.info_snapshot.n_log = 1;
-    sys.info_snapshot.n_start = 0;
+    sys.info_snapshot.n_log = -1;
+    sys.info_snapshot.n_start = -1;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]){
     sys.info_thermo.compute_dist_travelled = 0;
 
     sys.info_strobo.compute_stress = 1;
-    sys.info_strobo.compute_dist_travelled = 0;
+    sys.info_strobo.compute_dist_travelled = 1;
 
     
     constantInit(argc, argv, &sys);
@@ -80,19 +80,20 @@ int main(int argc, char *argv[]){
     //randomInitial(&sys);
     distribute_area(&sys);
     rsaInitial(&sys, 0.4);
-    //read_from_dump_initial(&sys, "dump/N_300qo_3.650000gamma_3.000000gammarate_0.100000Ka_1.000000v_16.dump", 0);
+    //read_from_dump_initial(&sys, "N_300qo_3.550000gamma_3.000000gammarate_0.100000Ka_3.000000v_2.dump", 35);
 
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
-        rkf45Step(&sys);
+        //backwardEulerStep(&sys);
+        //rkf45Step(&sys);
         //rk4Step(&sys);
         //eulerStep(&sys);
         //fireStep(&sys);
-        //conjugateGradientStep(&sys);
+        conjugateGradientStep(&sys);
         
     }
     
-    //check_force(&sys);
+    check_force(&sys);
 
 	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
@@ -201,7 +202,7 @@ void constantInit(int argc, char *argv[], data* sys){
         return;
     }
     if (control_dL == 0){
-        sys->dL = fminf(5/sys->L, 1.0);
+        sys->dL = fminf(4/sys->L, 1.0);
     }
 
     if (sys->parameter.gamma_rate == 0.0){
@@ -259,7 +260,7 @@ void constantInit(int argc, char *argv[], data* sys){
         }
     } while (1);
 
-    fprintf(sys->info_thermo.file, "i E gamma_actual ");
+    fprintf(sys->info_thermo.file, "i t E gamma_actual ");
     if (sys->info_thermo.compute_stress){
         fprintf(sys->info_thermo.file, "P shear ");
     }

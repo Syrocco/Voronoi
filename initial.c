@@ -3,6 +3,7 @@
 #include "helper.h"
 #include <math.h>
 #include "parser.h"
+#include "logger.h"
 
 void randomInitial(data* sys){
     sys->N_pbc = sys->N;
@@ -57,18 +58,31 @@ void read_from_dump_initial(data* sys, char* filename, int frame){
     Dump* dump = dump_open(filename,'r');		
     sys->N = get_natoms(dump);
 
-    char hboxy;
-    sys->L = get_boxx(&hboxy, 1, dump);
-
     if (frame < 0){
         frame = dump->nframes + frame;
     }
     jump_to_frame(frame, dump);
 
+    char hboxy, hboxx;
+    sys->L = get_boxy(&hboxy, 1, dump);
+    sys->gamma = (get_boxx(&hboxx, 0, dump) - sys->L)/sys->L;
+    sys->parameter.gamma_rate = 0;
+
+
+
     double x[sys->N], y[sys->N], prefered_area[sys->N];
     
     get_doubleatomprop("x", x, sys->N, dump);
     get_doubleatomprop("y", y, sys->N, dump);
+    char header[LINESIZE];
+    get_header("ATOMS", header, LINESIZE, dump);
+    //check if header contains prefered_area
+    if (strstr(header, "prefered_area") != NULL){
+        get_doubleatomprop("prefered_area", prefered_area, sys->N, dump);
+    }
+    else{
+        distribute_area(sys);
+    }
 
     sys->N_pbc = sys->N;
     for (int i = 0; i < sys->N; i++){
@@ -77,15 +91,8 @@ void read_from_dump_initial(data* sys, char* filename, int frame){
         sys->prefered_area[i] = prefered_area[i];
         addBoundary(sys, i);
     }
-    char header[LINESIZE];
-    get_header("ATOMS", header, LINESIZE, dump);
-    //check if header contains prefered_area
-    if (strstr(header, "prefered_area") != NULL){
-        get_doubleatomprop("prefered_area", sys->prefered_area, sys->N, dump);
-    }
-    else{
-        distribute_area(sys);
-    }
+
+    
     dump_close(dump);
 
 }

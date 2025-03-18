@@ -31,7 +31,7 @@ jcv_real energy_total(data* sys){
         if (sys->sites[i].index >= sys->N) continue;
         E += energy_unique(sys->sites + i, sys->prefered_area[sys->sites[i].index], &(sys->parameter));
     }
-    return E/sys->N;
+    return E;
 }
 
 // https://pmc.ncbi.nlm.nih.gov/articles/PMC11398538/pdf/nihpp-2409.04383v1.pdf

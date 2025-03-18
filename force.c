@@ -197,7 +197,7 @@ void check_force(data* sys){
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     compute_force(sys);
-    jcv_real old_energy = energy_total(sys);
+    jcv_real old_energy = energy_total(sys)/sys->N;
     jcv_real dx = 1e-7;
     jcv_real dy = 1e-7;
 
@@ -209,7 +209,7 @@ void check_force(data* sys){
         }
         jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
         sys->sites = jcv_diagram_get_sites(sys->diagram);
-        jcv_real new_energy = energy_total(sys); 
+        jcv_real new_energy = energy_total(sys)/sys->N; 
         sys->positions[i].x -= dx;
         jcv_real dE_dx = sys->N*(new_energy - old_energy)/dx;
 
@@ -220,7 +220,7 @@ void check_force(data* sys){
         }
         jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, 0, sys->diagram);
         sys->sites = jcv_diagram_get_sites(sys->diagram);
-        new_energy = energy_total(sys); 
+        new_energy = energy_total(sys)/sys->N; 
         sys->positions[i].y -= dy;
         jcv_real dE_dy =  sys->N*(new_energy - old_energy)/dy;
 

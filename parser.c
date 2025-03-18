@@ -376,10 +376,8 @@ void read_doublecol(char* sec,double* vec,int N,int m,Dump* dump){
 	char* saveptrline=NULL;
 	char* saveptrtok=NULL;
 	char* line=strtok_r(secbuff,"\n",&saveptrline);
-	printf("Line %s\n", line); 
 	for(int i=0;i<N;++i){
 		line=strtok_r(NULL,"\n",&saveptrline);
-		printf("Line %d: %s\n", i, line); 
 		if(line==NULL){
 			printf("[read_intcol]: In frame %d, section %s: line %d is out of bounds.\n",dump->curframe,dump->seclabels[secid],i);
 			exit(1);

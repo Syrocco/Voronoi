@@ -3,6 +3,7 @@
 
 #include "voronoi.h"
 
+void backwardEulerStep(data* sys);
 void rk4Step(data* sys);
 void rkf45Step(data* sys);
 void eulerStep(data* sys);
