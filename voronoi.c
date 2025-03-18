@@ -31,13 +31,13 @@ int main(int argc, char *argv[]){
     sys.dt = 1;
     sys.parameter.T = 0.0;
     sys.parameter.gamma_rate = 0.01;
-    sys.gamma_max = 2;
+    sys.gamma_max = 0.05;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
-    sys.shear_cycle = 0;
+    sys.shear_cycle = 1;
 
-    sys.info_snapshot.n_log = 1;
-    sys.info_snapshot.n_start = 0;
+    sys.info_snapshot.n_log = -1;
+    sys.info_snapshot.n_start = -1;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
@@ -90,8 +90,8 @@ int main(int argc, char *argv[]){
         //rkf45Step(&sys);
         //rk4Step(&sys);
         //eulerStep(&sys);
-        //fireStep(&sys);
-        conjugateGradientStep(&sys);
+        fireStep(&sys);
+        //conjugateGradientStep(&sys);
         
     }
     

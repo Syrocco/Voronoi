@@ -928,13 +928,13 @@ void fireStep(data* sys){
     
     const jcv_real alpha_start = 0.3;
    
-    const jcv_real f_inc = 1.1;
+    const jcv_real f_inc = 1.01;
     const jcv_real f_dec = 0.5;
     const jcv_real f_alpha = 0.99;
-    const int n_delay = 20;
+    const int n_delay = 50;
     
     const jcv_real dt_max = sys->dt_fire;
-    const jcv_real dt_min = sys->dt_fire/100;
+    const jcv_real dt_min = sys->dt_fire/300;
 
     int n_pos = 0;
     jcv_real dt_now = sys->dt_fire;
@@ -969,12 +969,15 @@ void fireStep(data* sys){
         vnorm = JCV_SQRT(vnorm);
         if (count > 2500){
             printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf, E = %lf\n", fnorm, vnorm, P, dt_now, energy_total(sys));
-            if (fnorm > 0.0001){
-                alpha_now = 1;
-                dt_now = 0.001;
-                P = 1;
-                vnorm = 1;
-                fnorm = 1; 
+            if (fnorm > 0.01){
+                if (count > 10000){
+                    alpha_now = 1;
+                    P = 1;
+                    vnorm = 1;
+                    fnorm = 1; 
+                    // Basically an euler integration of the E.O.M. with dt = dt_now
+                }
+                dt_now = 0.01;
             }
             
             //saveTXT(sys);
@@ -1021,7 +1024,7 @@ void fireStep(data* sys){
   
 
         
-    } while (fnorm/sys->L > 1e-8); // L = sqrt((float)N)
+    } while (fnorm/sys->L > 1e-11); // L = sqrt((float)N)
     
     loggers(sys);
 
