@@ -114,6 +114,7 @@ jcv_point get_edge_force_ii(const jcv_site* si, const jcv_real Ai, const paramet
 
         rj = &(edge->neighbor->p);
         rk = &(edge_after->neighbor->p);
+        //printf("g = (%.16lf, %.16lf)\n", edge->pos[1].x, edge->pos[1].y);
         derivative(ri, rj, rk, jacobian);
 
         jcv_point dE_dh = force_h(A, Ai, P, param->qo*JCV_SQRT(Ai), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
@@ -174,6 +175,7 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[1].x = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
     // ∂h.y/∂ri.y 
     jacobian[1].y = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
+    //printf("h = (%.16lf, %.16lf)\n", alpha*ri->x + beta*rj->x + gamma*rk->x, alpha*ri->y + beta*rj->y + gamma*rk->y);
 
 }
 

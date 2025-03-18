@@ -53,6 +53,18 @@ void distribute_area(data* sys){
     }
 }
 
+void random_area(data* sys, jcv_real min_area, jcv_real max_area){
+    jcv_real total_area = 0;
+    for (int i = 0; i < sys->N; i++){
+        sys->prefered_area[i] = drand(min_area, max_area);
+        total_area += sys->prefered_area[i];
+    }
+    jcv_real mean_area = total_area/sys->N;
+    for (int i = 0; i < sys->N; i++){
+        sys->prefered_area[i] = sys->prefered_area[i]/mean_area;
+    }
+}
+
 void read_from_dump_initial(data* sys, char* filename, int frame){
     
     Dump* dump = dump_open(filename,'r');		

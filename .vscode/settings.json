@@ -18,6 +18,7 @@
         "stdint.h": "c",
         "logger.h": "c",
         "omp.h": "c",
-        "thermo.h": "c"
+        "thermo.h": "c",
+        "errno.h": "c"
     }
 }

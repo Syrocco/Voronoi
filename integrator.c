@@ -9,7 +9,7 @@
 #include <omp.h>
 
 #define STAY_IN_LOCAL_MINIMA 0
-
+#define FORCE_BASED_MINIMIZATION 1
 
 #define TIME_FUNCTION(func, ...) \
     do { \
@@ -411,13 +411,83 @@ jcv_real line_search(data* sys, jcv_point* gradient, jcv_point *direction, jcv_r
         //printf("new_energy = %.9lf, old_energy = %.9lf, alpha = %.9lf\n", new_energy, old_energy, alpha);
 
         if (new_energy <= old_energy + c * alpha * dot_product) {
-            //printf("new_energy = %.9lf\n", new_energy);
             break;  // Stop if a Armijo condition is satisfied
         }
         alpha *= rho;  // Reduce step size
     }
     return alpha;
 }
+
+// Line search based on force magnitude reduction
+jcv_real line_search_by_force(data* sys, jcv_point* gradient, jcv_point* direction, 
+    jcv_real alpha, jcv_real rho, jcv_real c __attribute__((unused))) {
+
+
+    jcv_point x_old[sys->N];
+
+    // Store initial positions
+    for (int i = 0; i < sys->N; i++) {
+        x_old[i] = sys->positions[i];
+    }
+
+    // Calculate initial force magnitude squared
+    jcv_real initial_force_mag_sq = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        initial_force_mag_sq += jcv_lenght_sq(&sys->forces[i]);
+    }
+
+    // Calculate initial dot product to ensure we're going downhill
+    jcv_real dot_product = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        dot_product += jcv_dot(gradient[i], direction[i]);
+    }
+
+    // If going uphill, change direction to -gradient (pure gradient descent)
+    if (dot_product > 0) {
+        dot_product = 0;
+        for (int i = 0; i < sys->N; i++) {
+            direction[i] = sys->forces[i];
+            dot_product += jcv_dot(gradient[i], direction[i]);
+        }
+    }
+
+    int max_iterations = 20;  // Prevent infinite loop
+    int iter = 0;
+
+    while (iter++ < max_iterations) {
+        // Take a step
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = x_old[i].x + alpha * direction[i].x;
+            sys->positions[i].y = x_old[i].y + alpha * direction[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+
+        // Compute new forces
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+
+        // Calculate new force magnitude
+        jcv_real new_force_mag_sq = 0.0;
+        for (int i = 0; i < sys->N; i++) {
+            new_force_mag_sq += jcv_lenght_sq(&sys->forces[i]);
+        }
+
+        // Check if force magnitude has decreased
+        if (new_force_mag_sq < initial_force_mag_sq) {
+            return alpha;  // Accept this step size
+        }
+
+        alpha *= rho;  // Reduce step size
+
+    }
+
+    return alpha;  // Return the last tried alpha
+}
+
+
 
 // Custom mine search with backtracking and goldstein-armijo condition, as well as trying to say in the local minima.
 jcv_real line_search_local_minima(data* sys, jcv_point* gradient, jcv_point *direction, jcv_real alpha, jcv_real rho, jcv_real c){
@@ -471,7 +541,273 @@ jcv_real line_search_local_minima(data* sys, jcv_point* gradient, jcv_point *dir
     return alpha;
 }
 
+jcv_real line_search_by_force_local_minima(data* sys, jcv_point* gradient, jcv_point* direction, 
+    jcv_real alpha, jcv_real rho, jcv_real c __attribute__((unused))) {
+    
+    int can_increase = 1;
+
+    jcv_point x_old[sys->N];
+
+    // Store initial positions
+    for (int i = 0; i < sys->N; i++) {
+        x_old[i] = sys->positions[i];
+    }
+
+    // Calculate initial force magnitude squared
+    jcv_real initial_force_mag_sq = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        initial_force_mag_sq += jcv_lenght_sq(&sys->forces[i]);
+    }
+
+    // Calculate initial dot product to ensure we're going downhill
+    jcv_real dot_product = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        dot_product += jcv_dot(gradient[i], direction[i]);
+    }
+
+    // If going uphill, change direction to -gradient (pure gradient descent)
+    if (dot_product > 0) {
+        dot_product = 0;
+        for (int i = 0; i < sys->N; i++) {
+            direction[i] = sys->forces[i];
+            dot_product += jcv_dot(gradient[i], direction[i]);
+        }
+    }
+
+    int max_iterations = 20;  // Prevent infinite loop
+    int iter = 0;
+
+    while (iter++ < max_iterations) {
+        // Take a step
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = x_old[i].x + alpha * direction[i].x;
+            sys->positions[i].y = x_old[i].y + alpha * direction[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+
+        // Compute new forces
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+
+        // Calculate new force magnitude
+        jcv_real new_force_mag_sq = 0.0;
+        for (int i = 0; i < sys->N; i++) {
+            new_force_mag_sq += jcv_lenght_sq(&sys->forces[i]);
+        }
+
+        int validity_test = new_force_mag_sq < initial_force_mag_sq;
+        if (validity_test && can_increase == 0) {
+            break;  // Stop if a Armijo condition is satisfied
+        }
+        else if (validity_test && can_increase == 1){
+            alpha /= rho; //Start with small alpha, increases it while the energy decreases
+        }
+        else if (validity_test == 0){ //Then do regular backtracking
+            can_increase = 0;
+            alpha *= rho;  // Reduce step size
+        }
+
+    }
+
+    return alpha;  // Return the last tried alpha
+}
+
+// Add this function after the existing line search functions but before conjugateGradientStep
+
+jcv_real line_search_forcezero(data* sys, jcv_point* gradient __attribute__((unused)), jcv_point* direction, 
+    jcv_real alpha, jcv_real rho __attribute__((unused)), jcv_real c __attribute__((unused))) {
+    
+    jcv_point x_old[sys->N];
+    
+    // Constants (similar to LAMMPS)
+    const jcv_real ZERO_ENERGY = 1e-12;   // Max allowed energy increase
+    const jcv_real GRAD_TOL = 0.1;        // Target reduction for directional derivative
+    const jcv_real ALPHA_FACT = 0.1;      // Factor to reduce alpha when backtracking
+    const jcv_real MIN_ALPHA = 1e-14;     // Minimum allowed alpha before giving up
+    const jcv_real LIMIT_BOOST = 4.0;     // Maximum boost for alpha_del
+    
+    // Calculate maximum allowed step size (alpha_max)
+    jcv_real hmax = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        jcv_real h_mag = sqrt(direction[i].x*direction[i].x + direction[i].y*direction[i].y);
+        hmax = jcv_max(hmax, h_mag);
+    }
+    if (hmax < 1e-20) return 0.0;  // If search direction is effectively zero
+    
+    jcv_real alpha_max = 1.0 / hmax;  // Limit step size based on largest component
+    
+    // Store initial positions
+    for (int i = 0; i < sys->N; i++) {
+        x_old[i] = sys->positions[i];
+    }
+    
+    // Calculate initial force projection along search direction (fhCurr)
+    jcv_real fhCurr = 0.0;
+    for (int i = 0; i < sys->N; i++) {
+        fhCurr += jcv_dot(sys->forces[i], direction[i]);
+    }
+    
+    // If fhCurr <= 0, search direction isn't downhill
+    if (fhCurr <= 0.0) {
+        // Use gradient descent instead
+        for (int i = 0; i < sys->N; i++) {
+            direction[i] = sys->forces[i];
+        }
+        fhCurr = 0.0;
+        for (int i = 0; i < sys->N; i++) {
+            fhCurr += jcv_dot(sys->forces[i], direction[i]);
+        }
+        if (fhCurr <= 0.0) return 0.0;  // No improvement possible
+    }
+    
+    jcv_real fhOriginal = fhCurr;
+    jcv_real engCurr = energy_total(sys);
+    jcv_real engOriginal = engCurr;
+    
+    // Initialize alpha to 0
+    alpha = 0.0;
+    
+    // Initial alpha_del estimation
+    jcv_real alpha_init = jcv_max(1e-6, 0.1*fabs(engOriginal)/fhCurr);
+    jcv_real alpha_del = jcv_min(alpha_init, 0.5*alpha_max);
+    
+    // Main line search loop
+    int max_iter = 50;  // Prevent infinite loops
+    for (int iter = 0; iter < max_iter; iter++) {
+        int backtrack = 0;
+        jcv_real fhPrev = fhCurr;
+        jcv_real engPrev = engCurr;
+        
+        // Apply increment to alpha
+        alpha += alpha_del;
+        if (alpha > alpha_max) {
+            alpha = alpha_max;  // Could porobably break here
+        }
+        
+        // Take step with new alpha
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++) {
+            sys->positions[i].x = x_old[i].x + alpha * direction[i].x;
+            sys->positions[i].y = x_old[i].y + alpha * direction[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        
+        // Compute new forces and energy
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+        compute_force(sys);
+        engCurr = energy_total(sys);
+        
+        // Compute new directional derivative
+        fhCurr = 0.0;
+        jcv_real ffCurr = 0.0;  // Not used in this simplified version
+        for (int i = 0; i < sys->N; i++) {
+            fhCurr += jcv_dot(sys->forces[i], direction[i]);
+            ffCurr += jcv_dot(sys->forces[i], sys->forces[i]);
+        }
+        
+        // Check if energy increased
+        jcv_real de = engCurr - engPrev;
+        if (de > ZERO_ENERGY) {
+            backtrack = 1;
+        }
+        
+        // Check if directional derivative is sufficiently reduced
+        if (!backtrack && (fabs(fhCurr/fhOriginal) <= GRAD_TOL)) {
+            return alpha;  // Success: reduced gradient enough without increasing energy
+        }
+        
+        // Check if we overshot the minimum (derivative changed sign)
+        if (fhCurr < 0.0) {
+            backtrack = 1;
+        }
+        
+        // Handle backtracking
+        if (backtrack) {
+            // Move back to previous position
+            alpha -= alpha_del;
+            for (int i = 0; i < sys->N; i++) {
+                sys->positions[i].x = x_old[i].x + alpha * direction[i].x;
+                sys->positions[i].y = x_old[i].y + alpha * direction[i].y;
+                pbc(&sys->positions[i], sys->L, sys->gamma);
+                addBoundary(sys, i);
+            }
+            
+            // Recompute forces at reverted position
+            jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+            sys->sites = jcv_diagram_get_sites(sys->diagram);
+            compute_force(sys);
+            engCurr = engPrev;
+            fhCurr = fhPrev;
+            
+            // Determine new alpha_del
+            if (fhCurr < 0.0) {
+                // Force changed sign: linearize and solve for zero
+                alpha_del *= fhPrev/(fhPrev - fhCurr);
+            } else {
+                // Energy increased but force didn't change sign
+                alpha_del *= ALPHA_FACT;
+            }
+            
+            // Check if alpha_del is too small
+            if (alpha_del < MIN_ALPHA) {
+                // Restore original positions as fallback
+                sys->N_pbc = sys->N;
+                for (int i = 0; i < sys->N; i++) {
+                    sys->positions[i] = x_old[i];
+                    pbc(&sys->positions[i], sys->L, sys->gamma);
+                    addBoundary(sys, i);
+                }
+                jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+                sys->sites = jcv_diagram_get_sites(sys->diagram);
+                compute_force(sys);
+                return 0.0;  // Failed line search
+            }
+        } else {
+            // Successful step, try to be more aggressive with linearization
+            jcv_real boostFactor = LIMIT_BOOST;
+            
+            // Avoid problems near inflection point
+            if (fhPrev > fhCurr) {
+                boostFactor = fhCurr/(fhPrev - fhCurr);
+            }
+            
+            boostFactor = jcv_min(boostFactor, LIMIT_BOOST);
+            alpha_del *= boostFactor;
+            
+            // If we've reached alpha_max or directional derivative is close to zero
+            if (alpha >= alpha_max || fabs(fhCurr) < 1e-10) {
+                return alpha;  // Successful termination
+            }
+        }
+    }
+    
+    return alpha;  // Return current alpha value after max iterations
+}
+
 void conjugateGradientStep(data* sys) {
+
+    //pointer to line_search function  
+    jcv_real (*current_line_search)(data*, jcv_point*, jcv_point*, jcv_real, jcv_real, jcv_real);
+    #if FORCE_BASED_MINIMIZATION
+        current_line_search = line_search_forcezero;
+    #else
+        #if STAY_IN_LOCAL_MINIMA
+        current_line_search = line_search_local_minima;
+        #else
+        current_line_search = line_search;
+        #endif
+        int count = 0;
+        int minimize_with_force = 0;
+        jcv_real old_gnorm = 0.0;
+    #endif
+
+    jcv_real new_gnorm = 0.0;
+
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
     sys->sites = jcv_diagram_get_sites(sys->diagram);
 
@@ -491,22 +827,22 @@ void conjugateGradientStep(data* sys) {
 
     
 
-    #if STAY_IN_LOCAL_MINIMA
-    jcv_real alpha = 0.2;
-    #else
     jcv_real alpha = 1;
-    #endif
-
-    jcv_real new_gnorm = 0.0;
-    jcv_real old_gnorm = 0.0;
-    int count = 0;
+    
 
     while (1){
-        #if STAY_IN_LOCAL_MINIMA
-        alpha = line_search_local_minima(sys, gradient, delta, fmax(alpha, 1e-3), 0.5, 0.0001);
+
+        #if FORCE_BASED_MINIMIZATION
+            current_line_search(sys, gradient, delta, fmax(alpha, 1e-3), 0.5, 0.0001);
         #else
-        line_search(sys, gradient, delta, alpha, 0.2, 0.0001);
+            #if STAY_IN_LOCAL_MINIMA
+            alpha = current_line_search(sys, gradient, delta, fmax(alpha, 1e-3), 0.5, 0.0001);
+            #else
+            alpha = current_line_search(sys, gradient, delta, 0.2, 0.5, 0.0001);
+            #endif
         #endif
+
+
         compute_force(sys);
         new_gnorm = 0;
         for (int i = 0; i < 2 * sys->N; i++) {
@@ -515,23 +851,36 @@ void conjugateGradientStep(data* sys) {
         new_gnorm = JCV_SQRT(new_gnorm/sys->N);
         //printf("gnorm = %e, E = %.10e, alpha = %.10e\n", new_gnorm, energy_total(sys), alpha);
 
-        // Add counter because force is wrong
-        if (jcv_abs(new_gnorm - old_gnorm) < 1e-10){
-            count++;
-        }
-        else{
-            count = 0;
-        }
+        #if FORCE_BASED_MINIMIZATION == 0
+            // counter before using force based minimization criteria
+            if (jcv_abs(new_gnorm - old_gnorm) < 1e-14){
+                count++;
+            }
+            else{
+                count = 0;
+            }
 
+            if (count > 3){
+                break;
+                #if STAY_IN_LOCAL_MINIMA
+                current_line_search = line_search_by_force_local_minima;
+                #else
+                current_line_search = line_search_by_force;
+                #endif
+                minimize_with_force = 1;
+            }
+            if (minimize_with_force == 1 && (new_gnorm - old_gnorm) > 0){
+                break;
+            }
+        #endif
 
-        if (new_gnorm < 1e-8) {
+        if (new_gnorm < 1e-10){
             break;
         }
+
         
-        if (count > 3){
-            //printf("gnorm = %e\n", new_gnorm);
-            break;
-        }
+        
+        
         else{
             jcv_real numer = 0;
             jcv_real denom = 0;
@@ -547,7 +896,9 @@ void conjugateGradientStep(data* sys) {
                 delta[i].y = sys->forces[i].y + chi*delta[i].y;
             }
         }
+        #if STAY_IN_LOCAL_MINIMA && FORCE_BASED_MINIMIZATION == 0
         old_gnorm = new_gnorm;
+        #endif
         //saveTXT(sys);
     }
     

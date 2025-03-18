@@ -13,7 +13,8 @@
 #include <getopt.h>
 #include <errno.h>
 #include "thermo.h"
-jcv_real energyUnique(data* sys, const parameter* param, int num_particle);
+
+
 int main(int argc, char *argv[]){
     init_genrand(0);
 
@@ -26,17 +27,17 @@ int main(int argc, char *argv[]){
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 100000; 
-    sys.dt = 0.001;
+    sys.M = 100; 
+    sys.dt = 1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.0;
-    sys.gamma_max = 0.2;
+    sys.parameter.gamma_rate = 0.01;
+    sys.gamma_max = 2;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
-    sys.shear_cycle = 1;
+    sys.shear_cycle = 0;
 
-    sys.info_snapshot.n_log = -1;
-    sys.info_snapshot.n_start = -1;
+    sys.info_snapshot.n_log = 1;
+    sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
@@ -79,6 +80,7 @@ int main(int argc, char *argv[]){
 
     //randomInitial(&sys);
     distribute_area(&sys);
+    //random_area(&sys, 0.5, 1.5);
     rsaInitial(&sys, 0.4);
     //read_from_dump_initial(&sys, "N_300qo_3.550000gamma_3.000000gammarate_0.100000Ka_3.000000v_2.dump", 35);
 
@@ -93,7 +95,7 @@ int main(int argc, char *argv[]){
         
     }
     
-    check_force(&sys);
+    //check_force(&sys);
 
 	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
