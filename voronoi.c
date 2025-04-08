@@ -13,31 +13,31 @@
 #include <getopt.h>
 #include <errno.h>
 #include "thermo.h"
-
+#include "logger.h"
 
 int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
-    sys.parameter.qo = 3.65;
-    sys.parameter.Ka = 1;
+    sys.parameter.qo = 3.6;
+    sys.parameter.Ka = 0;
     sys.parameter.Kp = 1;
 
     sys.size_large_over_small = 4.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 100; 
+    sys.M = 1; 
     sys.dt = 1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.01;
-    sys.gamma_max = 0.05;
+    sys.parameter.gamma_rate = 0.00;
+    sys.gamma_max = 5;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
-    sys.shear_cycle = 1;
+    sys.shear_cycle = 0;
 
-    sys.info_snapshot.n_log = -1;
-    sys.info_snapshot.n_start = -1;
+    sys.info_snapshot.n_log = 1;
+    sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
     sys.info_snapshot.compute_dist_travelled = 0;
@@ -77,26 +77,41 @@ int main(int argc, char *argv[]){
     jcv_point old_positions3[sys.N];
     sys.old_info.old_positions_strobo = old_positions3;
 
-
     //randomInitial(&sys);
     distribute_area(&sys);
     //random_area(&sys, 0.5, 1.5);
     rsaInitial(&sys, 0.4);
-    //read_from_dump_initial(&sys, "N_300qo_3.550000gamma_3.000000gammarate_0.100000Ka_3.000000v_2.dump", 35);
-
+    //read_from_dump_initial(&sys, "dump/N_300qo_3.600000gamma_5.000000gammarate_-0.000000Ka_0.000000v_2.dump", 0);
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         //backwardEulerStep(&sys);
         //rkf45Step(&sys);
         //rk4Step(&sys);
         //eulerStep(&sys);
-        fireStep(&sys);
-        //conjugateGradientStep(&sys);
+        //fireStep(&sys);
+        conjugateGradientStep(&sys);
         
     }
-    
     //check_force(&sys);
+    /*  jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, NULL, sys.diagram);
+    sys.sites = jcv_diagram_get_sites(sys.diagram);
+    compute_force(&sys);
+    computeThermo(&sys);
+    computeLandscape(&sys);
+    saveTXT(&sys); */
 
+    /* for (int i = 0; i < sys.N_pbc; i++){
+        if (sys.sites[i].index != 0) continue;
+        jcv_graphedge* graph_edge = sys.sites[i].edges;
+        printf("np.array([");
+        while (graph_edge){
+            printf("[%.16lf, %.16lf],\n", graph_edge->pos[0].x, graph_edge->pos[0].y);
+            graph_edge = graph_edge->next;
+        }
+        printf("])");
+        printf(" area = %.16lf", jcv_area(sys.sites + i));
+        printf(" perimeter = %.16lf\n", jcv_perimeter(sys.sites + i));
+    } */
 	fclose(sys.info_snapshot.file);
 	jcv_diagram_free(sys.diagram);
 	return 0;
@@ -131,29 +146,37 @@ void constantInit(int argc, char *argv[], data* sys){
             case 'q':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->parameter.qo);
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &sys->parameter.qo);
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &sys->parameter.qo);
                 #endif
                 break;
             case 'k':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->parameter.Ka);
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &sys->parameter.Ka);
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &sys->parameter.Ka);
                 #endif
                 break;
             case 'P':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->parameter.Kp);
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &sys->parameter.Kp);
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &sys->parameter.Kp);
                 #endif
                 break;
             case 'D':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->dt);
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &sys->dt);
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &sys->dt);
                 #endif
                 break;
             case 'm':
@@ -162,30 +185,38 @@ void constantInit(int argc, char *argv[], data* sys){
             case 'd':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->dL);
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &sys->dL);
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &sys->dL);
                 #endif
                 control_dL = 1;
                 break;
             case 'T':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &(sys->parameter.T));
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &(sys->parameter.T));
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &(sys->parameter.T));
                 #endif
                 break;
             case 'g':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &(sys->gamma_max));
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &(sys->gamma_max));
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &(sys->gamma_max));   
                 #endif
                 break;
             case 'G':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &(sys->parameter.gamma_rate));
-                #else
+                #elif JCV_type == 1
                     sscanf(optarg, "%lf", &(sys->parameter.gamma_rate));
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &(sys->parameter.gamma_rate));
                 #endif
                 break;
             case 'v':
@@ -246,7 +277,7 @@ void constantInit(int argc, char *argv[], data* sys){
 
 	char filename[200];
     do {
-        sprintf(filename, "dump/N_%dqo_%fgamma_%fgammarate_%lfKa_%lfv_%d", sys->N, sys->parameter.qo, sys->gamma_max, -sys->parameter.gamma_rate, sys->parameter.Ka, version);
+        sprintf(filename, "dump/N_%dqo_%Lfgamma_%Lfgammarate_%LfKa_%Lfv_%d", sys->N, (long double)sys->parameter.qo, (long double)sys->gamma_max, -(long double)sys->parameter.gamma_rate, (long double)sys->parameter.Ka, version);
         char snapshot_filename[256], thermo_filename[256], strobo_filename[256];
         sprintf(snapshot_filename, "%s.dump", filename);
         sprintf(thermo_filename, "%s.thermo", filename);

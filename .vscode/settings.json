@@ -19,6 +19,7 @@
         "logger.h": "c",
         "omp.h": "c",
         "thermo.h": "c",
-        "errno.h": "c"
+        "errno.h": "c",
+        "quadmath.h": "c"
     }
 }

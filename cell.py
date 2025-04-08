@@ -14,6 +14,24 @@ from glob import glob
 import imageio
 cbar = None
 axval = None
+
+def polygon_area(vertices):
+    """Calculate the area of a polygon using the Shoelace formula."""
+    x = vertices[:, 0]
+    y = vertices[:, 1]
+    area = 0.5 * np.abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+    return area
+
+def polygon_perimeter(vertices):
+    """Calculate the perimeter of a polygon."""
+    perimeter = 0
+    for i in range(len(vertices)):
+        # Calculate the distance between consecutive vertices
+        p1 = vertices[i]
+        p2 = vertices[(i + 1) % len(vertices)]  # Wrap around to the first vertex
+        perimeter += np.linalg.norm(p2 - p1)
+    return perimeter
+
 def cellArray(loc, dump = False):
     return [Cell(data, dump) for data in sorted(glob(loc))]
 
@@ -34,7 +52,7 @@ class Cell(Dump):
         else:
             path = self.path + ".thermo"
             
-            
+        self.stop = 0
         with open(path, 'r') as file:
             try:
                 first_line = file.readline().strip()
@@ -42,7 +60,8 @@ class Cell(Dump):
                 try:
                     data = np.loadtxt(path, skiprows = 1)
                 except:
-                    data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+                    data = np.genfromtxt(path, skip_footer = 1, skip_header = 1)
+                    self.stop = 1
     
                 if data.ndim == 1:
                     data = data.reshape(1, -1)
@@ -55,36 +74,39 @@ class Cell(Dump):
         if loc[-1] == "b":
             path = loc
         else:
-            path = self.path + ".strob"
-            
-
-        with open(path, 'r') as file:
             try:
-                first_line = file.readline().strip()
-                column_names = first_line.split()
-                if column_names[0] == "i":
+                path = self.path + ".strob"
+                
+    
+                with open(path, 'r') as file:
                     try:
-                        data = np.loadtxt(path, skiprows = 1)
-                    except:
-                        try:
-                            data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
-                        except:
+                        first_line = file.readline().strip()
+                        column_names = first_line.split()
+                        if column_names[0] == "i":
                             try:
-                                data = np.loadtxt(path, skip_footer = 2, skiprows = 1)
+                                data = np.loadtxt(path, skiprows = 1)
                             except:
-                                pass
-        
-                    if data.ndim == 1:
-                        data = data.reshape(1, -1)
-        
-                    for i, col_name in enumerate(column_names):
-                        setattr(self, "s_"+col_name, data[:, i])
-                else:
-                    data = np.loadtxt(path)
-                    self.s_E = data[:, 1]
-                    self.s_i = data[:, 0]
-                    self.s_shear = data[:, 4]
-                    self.s_frac_active = data[:, 5]
+                                try:
+                                    data = np.loadtxt(path, skip_footer = 1, skiprows = 1)
+                                except:
+                                    try:
+                                        data = np.loadtxt(path, skip_footer = 2, skiprows = 1)
+                                    except:
+                                        pass
+                
+                            if data.ndim == 1:
+                                data = data.reshape(1, -1)
+                
+                            for i, col_name in enumerate(column_names):
+                                setattr(self, "s_"+col_name, data[:, i])
+                        else:
+                            data = np.loadtxt(path)
+                            self.s_E = data[:, 1]
+                            self.s_i = data[:, 0]
+                            self.s_shear = data[:, 4]
+                            self.s_frac_active = data[:, 5]
+                    except:
+                        print("could not recover .strob")
             except:
                 print("could not recover .strob")
     def extract_variables(self):
@@ -372,16 +394,69 @@ class Cell(Dump):
 
 
 
-if 0:      
+if 0:
+    x, y, a = cell.pbc(0, "perimeter")
+    points = np.vstack((x, y)).T
+    vor = Voronoi(points, qhull_options="Qc")
+    
+    region_idx = vor.point_region[0]
+    
+    # Get the region vertices indices
+    region = vor.regions[region_idx]
+    
+    if not region or -1 in region:
+        print("Particle 0 has an invalid Voronoi cell (possibly extending to infinity)")
+    else:
+        # Get the actual vertices coordinates
+        vertices = vor.vertices[region]
+        
+        print("Voronoi vertices for particle 0:")
+        for i, vertex in enumerate(vertices):
+            print(f"Vertex {i}: ({vertex[0]:.16f}, {vertex[1]:.16f})")
+            
+        # Calculate cell properties
+        area = polygon_area(vertices)
+        perimeter = polygon_perimeter(vertices)
+        
+        print(f"\nVoronoi cell properties:")
+        print(f"Area: {area:.16f}")
+        print(f"Perimeter: {perimeter:.16f}")
+        print(f"Number of vertices: {len(vertices)}")
+if 0:
+    # Calculate areas for each cell
+    areas = np.zeros(len(points))
+    for i, region in enumerate(vor.regions):
+        if not region or -1 in region:
+            continue
+        # Find which point this region belongs to
+        point_idx = None
+        for j, region_idx in enumerate(vor.point_region):
+            if region_idx == i and j < len(x):  # Ensure it's an original point
+                point_idx = j
+                break
+        if point_idx is not None:
+            polygon = vor.vertices[region]
+            areas[point_idx] = polygon_perimeter(polygon)
+        
 
-    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.550000gamma_3.000000gammarate_0.010000Ka_0.100000v_1.dump")
+if 1:
+    x = np.genfromtxt("landscapelongdouble.txt", dtype='str')
+    X = x[:, 0].astype(np.float128)
+    Y = x[:, 1].astype(np.float128)
+    Y = [float(a.split(".")[1][10:]) for a in x[:, 1]]
+    plt.plot(X, Y)
+    plt.yscale("log")
+    plt.xlabel("distance to starting point")
+    plt.ylabel("E")
+if 0:      
+    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.400000gamma_0.500000gammarate_-0.000000Ka_0.000000v_1.dump")
     cell.voronoi(frame = -2, shear = True)
     'cmasher:pepper'
     #a.save("shear", cmap ='jet', start = 2000, end = 2100, bar = False, shear = True, overide=False, frame_rate = 20, quant = None)
 
 
 if 0:
-    cell = Cell("/mnt/ssd/Documents/Voronoi/data/absorbing/FIRE/N_300qo_3.700000gamma_0.673684gammarate_0.001000Ka_1.000000v_1.thermo", False)
+    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.900000gamma_5.000000gammarate_0.010000Ka_0.000000v_1.dump", False)
     plt.plot(cell.gamma_actual[-10000:], cell.shear[-10000:])
     plt.xlabel(r"$\gamma$")
     plt.ylabel(r"$\sigma_{xy}$")

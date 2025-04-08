@@ -114,7 +114,7 @@ jcv_point get_edge_force_ii(const jcv_site* si, const jcv_real Ai, const paramet
 
         rj = &(edge->neighbor->p);
         rk = &(edge_after->neighbor->p);
-        //printf("g = (%.16lf, %.16lf)\n", edge->pos[1].x, edge->pos[1].y);
+        //printf("g = (%.16Lf, %.16Lf)\n", edge->pos[1].x, edge->pos[1].y);
         derivative(ri, rj, rk, jacobian);
 
         jcv_point dE_dh = force_h(A, Ai, P, param->qo*JCV_SQRT(Ai), &(edge->pos[0]), &(edge->pos[1]), &(edge_after->pos[1]), param);
@@ -149,7 +149,7 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jcv_real D = 2*rij_cross_rjk*rij_cross_rjk;
 
     if (D == 0){
-        printf("\nri = (%f, %f), rj =  (%f, %f), rk = (%f, %f)\n", ri->x, ri->y, rj->x, rj->y, rk->x, rk->y);
+        printf("\nri = (%Lf, %Lf), rj =  (%Lf, %Lf), rk = (%Lf, %Lf)\n", (long double)ri->x, (long double)ri->y, (long double)rj->x, (long double)rj->y, (long double)rk->x, (long double)rk->y);
         exit(3);
     }
 
@@ -175,7 +175,7 @@ void derivative(const jcv_point* ri, const jcv_point* rj, const jcv_point* rk, j
     jacobian[1].x = dalphadri.y*ri->x + dbetadri.y*rj->x + dgammadri.y*rk->x;
     // ∂h.y/∂ri.y 
     jacobian[1].y = alpha + dalphadri.y*ri->y + dbetadri.y*rj->y + dgammadri.y*rk->y;
-    //printf("h = (%.16lf, %.16lf)\n", alpha*ri->x + beta*rj->x + gamma*rk->x, alpha*ri->y + beta*rj->y + gamma*rk->y);
+    //printf("h = (%.16Lf, %.16Lf)\n", alpha*ri->x + beta*rj->x + gamma*rk->x, alpha*ri->y + beta*rj->y + gamma*rk->y);
 
 }
 
@@ -200,8 +200,8 @@ void check_force(data* sys){
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     compute_force(sys);
     jcv_real old_energy = energy_total(sys)/sys->N;
-    jcv_real dx = 1e-7;
-    jcv_real dy = 1e-7;
+    jcv_real dx = 1e-9;
+    jcv_real dy = 1e-9;
 
     for (int i = 0; i < sys->N; i++){
         sys->positions[i].x += dx;
@@ -226,10 +226,12 @@ void check_force(data* sys){
         sys->positions[i].y -= dy;
         jcv_real dE_dy =  sys->N*(new_energy - old_energy)/dy;
 
-        if (jcv_abs((dE_dx + sys->forces[i].x)/dE_dx) > 1e-2 && jcv_abs((dE_dy +sys->forces[i].y)/dE_dy) > 2e-1){
+        if (jcv_abs((dE_dx + sys->forces[i].x)/dE_dx) > 1e-1 || jcv_abs((dE_dy +sys->forces[i].y)/dE_dy) > 1e-1){
             printf("Force is wrong for %d\n", i);
-            printf("dE_dx = %.14lf, force_x = %.14lf\n", -dE_dx, sys->forces[i].x);
-            printf("dE_dy = %.14lf, force_y = %.14lf\n", -dE_dy, sys->forces[i].y);
+            printf("dE_dx = %.14Lf, force_x = %.14Lf\n", -(long double)dE_dx, (long double)sys->forces[i].x);
+            printf("dE_dy = %.14Lf, force_y = %.14Lf\n", -(long double)dE_dy, (long double)sys->forces[i].y);
+            printf("(dE_dx-force_x)/dE_dx = %.14Lf ", (long double)((dE_dx + sys->forces[i].x)/dE_dx));
+            printf("(dE_dy-force_y)/dE_dy = %.14Lf\n", (long double)((dE_dy + sys->forces[i].y)/dE_dy));
         }
     }
     saveTXT(sys);

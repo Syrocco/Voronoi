@@ -1,19 +1,19 @@
 CXX = gcc
 
 # Default configuration
-CXXFLAGS_DEFAULT = -Ofast -Wall -Wno-float-equal -Wextra -std=c11 -march=native -fopenmp
-LDFLAGS_DEFAULT = -lm
+CXXFLAGS_DEFAULT = -Ofast -Wall -Wno-float-equal -Wextra -std=c11 -march=native -fopenmp -fopt-info-vec-missed 
+LDFLAGS_DEFAULT = -lm -lquadmath
 
 # Debug configuration
-CXXFLAGS_DEBUG = -g -Wall -Wno-float-equal -Wextra 
-LDFLAGS_DEBUG = -lm
+CXXFLAGS_DEBUG = -g -Wall -Wno-float-equal -Wextra
+LDFLAGS_DEBUG = -lm -lquadmath
 
 # Full debug configuration with sanitizers
-CXXFLAGS_FULL_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11 -fsanitize=address -fsanitize=undefined -fsanitize=leak
-LDFLAGS_FULL_DEBUG = -lm 
+CXXFLAGS_FULL_DEBUG = -g -Wall -Wno-float-equal -Wextra -std=c11 -fsanitize=address -S-fsanitize=undefined -fsanitize=leak
+LDFLAGS_FULL_DEBUG = -lm -lquadmath
 
 CXXFLAGS_PROFILE = -pg -Wall -Wno-float-equal -Wextra -std=c11
-LDFLAGS_PROFILE = -lm 
+LDFLAGS_PROFILE = -lm  -lquadmath
 
 TARGET = voronoi
 SRC = voronoi.c helper.c force.c initial.c integrator.c logger.c thermo.c parser.c

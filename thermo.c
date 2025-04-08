@@ -21,8 +21,10 @@ void shear(data* sys){
 }
 
 inline jcv_real energy_unique(const jcv_site* site, const jcv_real A, const parameter* param){
-    return param->Ka*(jcv_area(site) - A)*(jcv_area(site) - A)
-           + param->Kp*(jcv_perimeter(site) - param->qo*JCV_SQRT(A))*(jcv_perimeter(site) - param->qo*JCV_SQRT(A));
+    jcv_real area = jcv_area(site);
+    jcv_real perimeter = jcv_perimeter(site);
+    return param->Ka*(area - A)*(area - A)
+           + param->Kp*(perimeter - param->qo*JCV_SQRT(A))*(perimeter - param->qo*JCV_SQRT(A));
 }
 
 jcv_real energy_total(data* sys){

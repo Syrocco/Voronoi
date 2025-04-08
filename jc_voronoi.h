@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <float.h>
-
+#include <quadmath.h>
 #include <assert.h>
 
 #ifdef __cplusplus
@@ -21,58 +21,92 @@ extern "C" {
 
 #if JCV_type == 1
     #define JCV_REAL_TYPE double
-#else
+#elif JCV_type == 2
+    #define JCV_REAL_TYPE long double
+#elif JCV_type == 0
     #define JCV_REAL_TYPE float
+#elif JCV_type == 3
+    #define JCV_REAL_TYPE __float128
+#endif
+
+#if JCV_type == 1
+    #define JCV_COS(_X_) cos(_X_)
+#elif JCV_type == 2
+    #define JCV_COS(_X_) cosl(_X_)
+#elif JCV_type == 0
+    #define JCV_COS(_X_) cosf(_X_)
+#elif JCV_type == 3
+    #define JCV_COS(_X_) cosq(_X_)
+#endif
+
+#if JCV_type == 1
+    #define JCV_SIN(_X_) sin(_X_)
+#elif JCV_type == 2
+    #define JCV_SIN(_X_) sinl(_X_)
+#elif JCV_type == 0
+    #define JCV_SIN(_X_) sinf(_X_)
+#elif JCV_type == 3
+    #define JCV_SIN(_X_) sinq(_X_)
 #endif
 
 #if JCV_type == 1
     #define JCV_REAL_TYPE_EPSILON DBL_EPSILON
-#else
+#elif JCV_type == 2
+    #define JCV_REAL_TYPE_EPSILON LDBL_EPSILON
+#elif JCV_type == 0
     #define JCV_REAL_TYPE_EPSILON FLT_EPSILON
+#elif JCV_type == 3
+    #define JCV_REAL_TYPE_EPSILON FLT128_EPSILON
 #endif
 
 
 #if JCV_type == 1
     #define JCV_ATAN2(_Y_, _X_) atan2(_Y_, _X_) 
-#else
+#elif JCV_type == 2
+    #define JCV_ATAN2(_Y_, _X_) atan2l(_Y_, _X_)
+#elif JCV_type == 0
     #define JCV_ATAN2(_Y_, _X_) atan2f(_Y_, _X_) 
+#elif JCV_type == 3
+    #define JCV_ATAN2(_Y_, _X_) atan2q(_Y_, _X_)
 #endif
 
 
 #if JCV_type == 1
     #define JCV_SQRT(_X_) sqrt(_X_)
-#else
+#elif JCV_type == 2
+    #define JCV_SQRT(_X_) sqrtl(_X_)
+#elif JCV_type == 0
     #define JCV_SQRT(_X_) sqrtf(_X_)
+#elif JCV_type == 3
+    #define JCV_SQRT(_X_) sqrtq(_X_)
 #endif
 
-#if JCV_type == 1
-    #define JCV_COS(_X_) cos(_X_)
-#else    
-    #define JCV_COS(_X_) cosf(_X_)
-#endif
 
-#if JCV_type == 1
-    #define JCV_SIN(_X_) sin(_X_)
-#else
-    #define JCV_SIN(_X_) sinf(_X_)
-#endif
 
 #if JCV_type == 1
     #define JCV_LOG(_X_) log(_X_)
-#else
+#elif JCV_type == 2
+    #define JCV_LOG(_X_) logl(_X_)
+#elif JCV_type == 0
     #define JCV_LOG(_X_) logf(_X_)
+#elif JCV_type == 3
+    #define JCV_LOG(_X_) logq(_X_)
 #endif
 
 
 #ifndef JCV_PI
-    #define JCV_PI 3.14159265358979323846264338327950288f
+    #define JCV_PI 3.14159265358979323846264338327950288
 #endif
 
 
 #if JCV_type == 1
     #define JCV_FLT_MAX 1.7976931348623157E+308
-#else
+#elif JCV_type == 2
+    #define JCV_FLT_MAX 1.18973149535723176502129E+4932L
+#elif JCV_type == 0
     #define JCV_FLT_MAX 3.402823466e+38F
+#elif JCV_type == 3
+    #define JCV_FLT_MAX 1.18973149535723176502129E+4932L // approx
 #endif
 
 

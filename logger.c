@@ -26,16 +26,16 @@ void loggers(data* sys){
 void computeThermo(data* sys){
     
     jcv_real E = energy_total(sys)/sys->N;
-    fprintf(sys->info_thermo.file, "%d %lf %.16lf %lf ", sys->i, sys->time, E, sys->gamma);
-    printf("i = %d, dt = %lf, E = %.16lf, γ = %.12lf ", sys->i, sys->dt, E, sys->gamma);
+    fprintf(sys->info_thermo.file, "%d %Lf %.16Lf %Lf ", sys->i, (long double)sys->time, (long double)E, (long double)sys->gamma);
+    printf("i = %d, dt = %Lf, E = %.16Lf, γ = %.16Lf ", sys->i, (long double)sys->dt, (long double)E, (long double)sys->gamma);
 
     if (sys->info_thermo.compute_stress){
         jcv_real stress[2][2];
         stress_total(sys, stress);
         jcv_real shear_stress = (stress[0][1] + stress[1][0])/2;
         jcv_real pressure = (stress[0][0] + stress[1][1])/2;
-        fprintf(sys->info_thermo.file, "%lf %lf ", pressure, shear_stress);
-        printf("P = %lf, shear = %lf ", pressure, shear_stress);
+        fprintf(sys->info_thermo.file, "%.16Lf %.16Lf ", (long double)pressure, (long double)shear_stress);
+        printf("P = %Lf, shear = %Lf ", (long double)pressure, (long double)shear_stress);
     }
     
     if (sys->info_thermo.compute_dist_travelled){
@@ -52,8 +52,8 @@ void computeThermo(data* sys){
             }
         }
         frac_active = frac_active/sys->N;
-        fprintf(sys->info_thermo.file, "%lf ", frac_active);
-        printf("frac_active = %lf ", frac_active);
+        fprintf(sys->info_thermo.file, "%Lf ", (long double)frac_active);
+        printf("frac_active = %Lf ", (long double)frac_active);
     }
     fprintf(sys->info_thermo.file, "\n");
     printf("\n");
@@ -63,14 +63,14 @@ void computeThermo(data* sys){
 void computeStrobo(data* sys){
     
     jcv_real E = energy_total(sys)/sys->N;
-    fprintf(sys->info_strobo.file, "%d %lf %lf ", sys->i, E, sys->gamma);
+    fprintf(sys->info_strobo.file, "%d %Lf %Lf ", sys->i, (long double)E, (long double)sys->gamma);
 
     if (sys->info_strobo.compute_stress){
         jcv_real stress[2][2];
         stress_total(sys, stress);
         jcv_real shear_stress = (stress[0][1] + stress[1][0])/2;
         jcv_real pressure = (stress[0][0] + stress[1][1])/2;
-        fprintf(sys->info_strobo.file, "%lf %lf ", pressure, shear_stress);
+        fprintf(sys->info_strobo.file, "%Lf %Lf ", (long double)pressure, (long double)shear_stress);
     }
     
     if (sys->info_strobo.compute_dist_travelled){
@@ -83,7 +83,7 @@ void computeStrobo(data* sys){
             }
         }
         frac_active = frac_active/sys->N;
-        fprintf(sys->info_strobo.file, "%lf ", frac_active);
+        fprintf(sys->info_strobo.file, "%Lf ", (long double)frac_active);
         if (frac_active == 0){
             printf("No more active particles");
             exit(3);
@@ -99,7 +99,6 @@ void saveTXT(data* sys){
     jcv_real L = sys->L;    
     jcv_point* p = sys->positions;
     jcv_point* f = sys->forces;
-    jcv_point* v = sys->velocities;
     jcv_real* a = sys->prefered_area;
     int N = sys->N;
     int m = sys->i;
@@ -114,7 +113,7 @@ void saveTXT(data* sys){
 
  
 
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%f %f %f\n0 %f 0\n0 0 0\nITEM: ATOMS id prefered_area x y vx vy fx fy ", m, NN, fmin(0, dL), fmax(L, L + dL), dL, L);
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%Lf %Lf %Lf\n0 %Lf 0\n0 0 0\nITEM: ATOMS id prefered_area x y fx fy ", m, NN, (long double)jcv_min(0, dL), (long double)jcv_max(L, L + dL), (long double)dL, (long double)L);
     if (sys->info_snapshot.compute_stress){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){
@@ -144,7 +143,7 @@ void saveTXT(data* sys){
     
     for(int i = 0; i < NN; i++){
         if (i >= N){
-            fprintf(file, "%d %lf %lf %lf nan nan nan nan ", i, a[i], p[i].x, p[i].y);
+            fprintf(file, "%d %Lf %Lf %Lf nan nan nan nan ", i, (long double)a[i], (long double)p[i].x, (long double)p[i].y);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "nan ");
             }
@@ -160,18 +159,18 @@ void saveTXT(data* sys){
             fprintf(file, "\n");
         }
         else{
-            fprintf(file, "%d %.16lf %.16lf %.16lf %.16lf %.16lf %.16lf %.16lf ", i, a[i], p[i].x, p[i].y, v[i].x, v[i].y, f[i].x, f[i].y);
+            fprintf(file, "%d %.16Lf %.16Lf %.16Lf %.16Lf %.16Lf ", i, (long double)a[i], (long double)p[i].x, (long double)p[i].y, (long double)f[i].x, (long double)f[i].y);
             if (sys->info_snapshot.compute_stress){
-                fprintf(file, "%lf ", (stress[i][0][1] + stress[i][1][0])/2);
+                fprintf(file, "%.16Lf ", (long double)(stress[i][0][1] + stress[i][1][0])/2);
             }
             if (sys->info_snapshot.compute_dist_travelled){
-                fprintf(file, "%lf ", distance_move[i]);
+                fprintf(file, "%Lf ", (long double)distance_move[i]);
             }
             if (sys->info_snapshot.compute_area){
-                fprintf(file, "%lf ", area[i]);
+                fprintf(file, "%.16Lf ", (long double)area[i]);
             }
             if (sys->info_snapshot.compute_perimeter){
-                fprintf(file, "%lf ", perimeter[i]);
+                fprintf(file, "%.16Lf ", (long double)perimeter[i]);
             }
             fprintf(file, "\n");
         }
@@ -188,7 +187,7 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
 
     fprintf(file, "%d %d\n", N, N_pbc);
     for (int i = 0; i < N_pbc; i++) {
-        fprintf(file, "%f %f\n", (float)points[i].x, (float)points[i].y);
+        fprintf(file, "%Lf %Lf\n", (long double)points[i].x, (long double)points[i].y);
     }
 
     const jcv_graphedge* graph_edge;
@@ -197,8 +196,8 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
 
         graph_edge = sites[i].edges;
         while (graph_edge) {
-            fprintf(file, "%f %f\n", (float)graph_edge->pos[0].x, (float)graph_edge->pos[0].y);
-            fprintf(file, "%f %f\n", (float)graph_edge->pos[1].x, (float)graph_edge->pos[1].y);
+            fprintf(file, "%Lf %Lf\n", (long double)graph_edge->pos[0].x, (long double)graph_edge->pos[0].y);
+            fprintf(file, "%Lf %Lf\n", (long double)graph_edge->pos[1].x, (long double)graph_edge->pos[1].y);
             graph_edge = graph_edge->next;
         }
     }
@@ -206,7 +205,7 @@ void write(FILE* file, const char* filename, const jcv_point* points, const jcv_
 }
 
 void unexpectedClosure(data* sys){
-    fprintf(sys->info_thermo.file, "nan nan nan ");
+    fprintf(sys->info_thermo.file, "nan nan nan nan ");
     if (sys->info_thermo.compute_stress){
         fprintf(sys->info_thermo.file, "nan nan ");
     }

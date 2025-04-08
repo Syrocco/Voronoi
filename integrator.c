@@ -8,8 +8,8 @@
 #include <time.h>
 #include <omp.h>
 
-#define STAY_IN_LOCAL_MINIMA 0
-#define FORCE_BASED_MINIMIZATION 1
+#define STAY_IN_LOCAL_MINIMA 1
+#define FORCE_BASED_MINIMIZATION 0
 
 #define TIME_FUNCTION(func, ...) \
     do { \
@@ -671,7 +671,7 @@ jcv_real line_search_forcezero(data* sys, jcv_point* gradient __attribute__((unu
     alpha = 0.0;
     
     // Initial alpha_del estimation
-    jcv_real alpha_init = jcv_max(1e-6, 0.1*fabs(engOriginal)/fhCurr);
+    jcv_real alpha_init = jcv_max(1e-6, 0.1*jcv_abs(engOriginal)/fhCurr);
     jcv_real alpha_del = jcv_min(alpha_init, 0.5*alpha_max);
     
     // Main line search loop
@@ -717,7 +717,7 @@ jcv_real line_search_forcezero(data* sys, jcv_point* gradient __attribute__((unu
         }
         
         // Check if directional derivative is sufficiently reduced
-        if (!backtrack && (fabs(fhCurr/fhOriginal) <= GRAD_TOL)) {
+        if (!backtrack && (jcv_abs(fhCurr/fhOriginal) <= GRAD_TOL)) {
             return alpha;  // Success: reduced gradient enough without increasing energy
         }
         
@@ -730,6 +730,7 @@ jcv_real line_search_forcezero(data* sys, jcv_point* gradient __attribute__((unu
         if (backtrack) {
             // Move back to previous position
             alpha -= alpha_del;
+            sys->N_pbc = sys->N;
             for (int i = 0; i < sys->N; i++) {
                 sys->positions[i].x = x_old[i].x + alpha * direction[i].x;
                 sys->positions[i].y = x_old[i].y + alpha * direction[i].y;
@@ -780,7 +781,7 @@ jcv_real line_search_forcezero(data* sys, jcv_point* gradient __attribute__((unu
             alpha_del *= boostFactor;
             
             // If we've reached alpha_max or directional derivative is close to zero
-            if (alpha >= alpha_max || fabs(fhCurr) < 1e-10) {
+            if (alpha >= alpha_max || jcv_abs(fhCurr) < 1e-10) {
                 return alpha;  // Successful termination
             }
         }
@@ -849,11 +850,14 @@ void conjugateGradientStep(data* sys) {
             new_gnorm += jcv_lenght_sq(&sys->forces[i]);
         }
         new_gnorm = JCV_SQRT(new_gnorm/sys->N);
-        //printf("gnorm = %e, E = %.10e, alpha = %.10e\n", new_gnorm, energy_total(sys), alpha);
-
+        printf("gnorm = %Le, E = %.10Le, alpha = %.10Le\n", (long double)new_gnorm, (long double)energy_total(sys), (long double)alpha);
+        /* if (new_gnorm < 4e-8){
+            computeLandscape(sys);
+            exit(3);
+        } */
         #if FORCE_BASED_MINIMIZATION == 0
             // counter before using force based minimization criteria
-            if (jcv_abs(new_gnorm - old_gnorm) < 1e-14){
+            if (jcv_abs(new_gnorm - old_gnorm) < JCV_REAL_TYPE_EPSILON){
                 count++;
             }
             else{
@@ -861,6 +865,7 @@ void conjugateGradientStep(data* sys) {
             }
 
             if (count > 3){
+                //computeLandscape(sys);
                 break;
                 #if STAY_IN_LOCAL_MINIMA
                 current_line_search = line_search_by_force_local_minima;
@@ -874,7 +879,7 @@ void conjugateGradientStep(data* sys) {
             }
         #endif
 
-        if (new_gnorm < 1e-10){
+        if (new_gnorm < 1e-15){
             break;
         }
 
@@ -913,6 +918,40 @@ void conjugateGradientStep(data* sys) {
         }
     }
 } 
+
+
+void computeLandscape(data* sys){
+    printf("Computing landscape...\n");
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    compute_force(sys);
+    FILE* f = fopen("landscape.txt", "w");
+    jcv_real maxdt = 0.3;
+    jcv_real runner = -maxdt;
+    sys->N_pbc = sys->N;
+    for (int i = 0; i < sys->N; i++){
+        sys->positions[i].x += runner*sys->forces[i].x;
+        sys->positions[i].y += runner*sys->forces[i].y;
+        pbc(&sys->positions[i], sys->L, sys->gamma);
+        addBoundary(sys, i);
+    }
+    jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+    sys->sites = jcv_diagram_get_sites(sys->diagram);
+    jcv_real dt = 0.001;
+    for (jcv_real DT = runner; DT < maxdt; DT += dt){
+        jcv_real energy = energy_total(sys);
+        fprintf(f, "%.20Lf %.20Lf\n", (long double)DT, (long double)energy);
+        sys->N_pbc = sys->N;
+        for (int i = 0; i < sys->N; i++){
+            sys->positions[i].x += dt*sys->forces[i].x;
+            sys->positions[i].y += dt*sys->forces[i].y;
+            pbc(&sys->positions[i], sys->L, sys->gamma);
+            addBoundary(sys, i);
+        }
+        jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
+        sys->sites = jcv_diagram_get_sites(sys->diagram);
+    }
+}
 
 void fireStep(data* sys){
     jcv_diagram_generate(sys->N_pbc, sys->positions, NULL, NULL, sys->diagram);
@@ -968,7 +1007,7 @@ void fireStep(data* sys){
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
         if (count > 2500){
-            printf("fnorm = %.14lf, vnorm = %lf, P = %lf, dt = %lf, E = %lf\n", fnorm, vnorm, P, dt_now, energy_total(sys));
+            printf("fnorm = %.14Lf, vnorm = %Lf, P = %Lf, dt = %Lf, E = %Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
             if (fnorm > 0.01){
                 if (count > 10000){
                     alpha_now = 1;
@@ -977,7 +1016,7 @@ void fireStep(data* sys){
                     fnorm = 1; 
                     // Basically an euler integration of the E.O.M. with dt = dt_now
                 }
-                dt_now = 0.01;
+                dt_now = 0.005;
             }
             
             //saveTXT(sys);
@@ -1023,7 +1062,7 @@ void fireStep(data* sys){
         }
   
 
-        
+    //printf("fnorm = %.12lf\n", fnorm);
     } while (fnorm/sys->L > 1e-11); // L = sqrt((float)N)
     
     loggers(sys);

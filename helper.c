@@ -40,6 +40,7 @@ inline jcv_real jcv_perimeter(const jcv_site* a){
     while (e){
         perimeter += jcv_point_dist(&e->pos[0], &e->pos[1]);
         e = e->next;
+        
     }
     return perimeter;
 }
