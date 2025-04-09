@@ -113,7 +113,7 @@ void saveTXT(data* sys){
 
  
 
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%Lf %Lf %Lf\n0 %Lf 0\n0 0 0\nITEM: ATOMS id prefered_area x y fx fy ", m, NN, (long double)jcv_min(0, dL), (long double)jcv_max(L, L + dL), (long double)dL, (long double)L);
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%.16Lf %.16Lf %.16Lf\n0 %.16Lf 0\n0 0 0\nITEM: ATOMS id prefered_area x y fx fy ", m, NN, (long double)jcv_min(0, dL), (long double)jcv_max(L, L + dL), (long double)dL, (long double)L);
     if (sys->info_snapshot.compute_stress){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){

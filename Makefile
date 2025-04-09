@@ -1,7 +1,7 @@
 CXX = gcc
 
 # Default configuration
-CXXFLAGS_DEFAULT = -Ofast -Wall -Wno-float-equal -Wextra -std=c11 -march=native -fopenmp -fopt-info-vec-missed 
+CXXFLAGS_DEFAULT = -Ofast -Wall -Wno-float-equal -Wextra -std=c11 -march=native -fopenmp #-fopt-info-vec-missed 
 LDFLAGS_DEFAULT = -lm -lquadmath
 
 # Debug configuration

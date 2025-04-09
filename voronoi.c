@@ -19,19 +19,19 @@ int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
-    sys.parameter.qo = 3.6;
-    sys.parameter.Ka = 0;
+    sys.parameter.qo = 3.9;
+    sys.parameter.Ka = 1;
     sys.parameter.Kp = 1;
 
-    sys.size_large_over_small = 4.0/3.0;
+    sys.size_large_over_small = 3.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 1; 
+    sys.M = 2; 
     sys.dt = 1;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.00;
-    sys.gamma_max = 5;
+    sys.parameter.gamma_rate = 0.01;
+    sys.gamma_max = 0.01;
     sys.shear_start = 0;
     sys.dt_fire = 0.1;
     sys.shear_cycle = 0;
@@ -81,17 +81,23 @@ int main(int argc, char *argv[]){
     distribute_area(&sys);
     //random_area(&sys, 0.5, 1.5);
     rsaInitial(&sys, 0.4);
-    //read_from_dump_initial(&sys, "dump/N_300qo_3.600000gamma_5.000000gammarate_-0.000000Ka_0.000000v_2.dump", 0);
+    read_from_dump_initial(&sys, "N_300qo_3.900000gamma_5.000000gammarate_-0.000000Ka_0.000000v_2.dump", 0);
+
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         //backwardEulerStep(&sys);
         //rkf45Step(&sys);
         //rk4Step(&sys);
         //eulerStep(&sys);
-        //fireStep(&sys);
-        conjugateGradientStep(&sys);
+        fireStep(&sys);
+        //conjugateGradientStep(&sys);
         
     }
+    jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, NULL, sys.diagram);
+    sys.sites = jcv_diagram_get_sites(sys.diagram);
+    compute_force(&sys);
+    computeThermo(&sys);
+    saveTXT(&sys);
     //check_force(&sys);
     /*  jcv_diagram_generate(sys.N_pbc, sys.positions, NULL, NULL, sys.diagram);
     sys.sites = jcv_diagram_get_sites(sys.diagram);
@@ -138,8 +144,8 @@ void constantInit(int argc, char *argv[], data* sys){
     int version = 1;
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:G:v:", longopt, NULL)) != -1){
-        switch(c){
+    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:G:v:", longopt, NULL)) != -1) {
+        switch (c) {
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
                 break;
@@ -150,6 +156,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->parameter.qo);
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &sys->parameter.qo);
+                #elif JCV_type == 3
+                    sys->parameter.qo = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'k':
@@ -159,6 +167,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->parameter.Ka);
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &sys->parameter.Ka);
+                #elif JCV_type == 3
+                    sys->parameter.Ka = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'P':
@@ -168,6 +178,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->parameter.Kp);
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &sys->parameter.Kp);
+                #elif JCV_type == 3
+                    sys->parameter.Kp = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'D':
@@ -177,6 +189,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->dt);
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &sys->dt);
+                #elif JCV_type == 3
+                    sys->dt = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'm':
@@ -189,6 +203,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &sys->dL);
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &sys->dL);
+                #elif JCV_type == 3
+                    sys->dL = strtoflt128(optarg, NULL);
                 #endif
                 control_dL = 1;
                 break;
@@ -199,6 +215,8 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &(sys->parameter.T));
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &(sys->parameter.T));
+                #elif JCV_type == 3
+                    sys->parameter.T = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'g':
@@ -207,7 +225,9 @@ void constantInit(int argc, char *argv[], data* sys){
                 #elif JCV_type == 1
                     sscanf(optarg, "%lf", &(sys->gamma_max));
                 #elif JCV_type == 2
-                    sscanf(optarg, "%Lf", &(sys->gamma_max));   
+                    sscanf(optarg, "%Lf", &(sys->gamma_max));
+                #elif JCV_type == 3
+                    sys->gamma_max = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'G':
@@ -217,12 +237,16 @@ void constantInit(int argc, char *argv[], data* sys){
                     sscanf(optarg, "%lf", &(sys->parameter.gamma_rate));
                 #elif JCV_type == 2
                     sscanf(optarg, "%Lf", &(sys->parameter.gamma_rate));
+                #elif JCV_type == 3
+                    sys->parameter.gamma_rate = strtoflt128(optarg, NULL);
                 #endif
                 break;
             case 'v':
                 sscanf(optarg, "%d", &version);
                 init_genrand(version);
                 break;
+            default:
+                printf("Usage: %s [options]\n", argv[0]);
         }
     }
     sys->L = JCV_SQRT((JCV_REAL_TYPE)sys->N);

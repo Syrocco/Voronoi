@@ -200,8 +200,8 @@ void check_force(data* sys){
     sys->sites = jcv_diagram_get_sites(sys->diagram);
     compute_force(sys);
     jcv_real old_energy = energy_total(sys)/sys->N;
-    jcv_real dx = 1e-9;
-    jcv_real dy = 1e-9;
+    jcv_real dx = 1e-26;
+    jcv_real dy = 1e-26;
 
     for (int i = 0; i < sys->N; i++){
         sys->positions[i].x += dx;
@@ -226,7 +226,7 @@ void check_force(data* sys){
         sys->positions[i].y -= dy;
         jcv_real dE_dy =  sys->N*(new_energy - old_energy)/dy;
 
-        if (jcv_abs((dE_dx + sys->forces[i].x)/dE_dx) > 1e-1 || jcv_abs((dE_dy +sys->forces[i].y)/dE_dy) > 1e-1){
+        if (jcv_abs((dE_dx + sys->forces[i].x)/dE_dx) > 1e-100 || jcv_abs((dE_dy +sys->forces[i].y)/dE_dy) > 1e-100){
             printf("Force is wrong for %d\n", i);
             printf("dE_dx = %.14Lf, force_x = %.14Lf\n", -(long double)dE_dx, (long double)sys->forces[i].x);
             printf("dE_dy = %.14Lf, force_y = %.14Lf\n", -(long double)dE_dy, (long double)sys->forces[i].y);

@@ -20,6 +20,12 @@
         "omp.h": "c",
         "thermo.h": "c",
         "errno.h": "c",
-        "quadmath.h": "c"
+        "quadmath.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "span": "c",
+        "iterator": "c",
+        "vector": "c"
     }
 }

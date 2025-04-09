@@ -437,14 +437,22 @@ if 0:
         if point_idx is not None:
             polygon = vor.vertices[region]
             areas[point_idx] = polygon_perimeter(polygon)
-        
 
+if 0:    
+    data = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.900000gamma_0.010000gammarate_0.010000Ka_0.000000v_1.dump")
+    fx = data.get_atompropf("fx")
+    fxa = np.loadtxt("/home/syrocco/Downloads/a.txt", skiprows = 1, delimiter=",")[:, 4]
+    diff = (fx - fxa)/fx
+    print(np.round(diff, 2))
 if 1:
-    x = np.genfromtxt("landscapelongdouble.txt", dtype='str')
+    x = np.genfromtxt("landscape.txt", dtype='str')
     X = x[:, 0].astype(np.float128)
     Y = x[:, 1].astype(np.float128)
-    Y = [float(a.split(".")[1][10:]) for a in x[:, 1]]
-    plt.plot(X, Y)
+    """ try:
+        #Y = [float(a.split(".")[1][10:]) for a in x[:, 1]]
+    except:"""
+    Y = [float(a) for a in x[:, 1]]
+    plt.scatter(X, Y)
     plt.yscale("log")
     plt.xlabel("distance to starting point")
     plt.ylabel("E")

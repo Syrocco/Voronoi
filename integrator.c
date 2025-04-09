@@ -830,7 +830,7 @@ void conjugateGradientStep(data* sys) {
 
     jcv_real alpha = 1;
     
-
+    //int count1 = 0;
     while (1){
 
         #if FORCE_BASED_MINIMIZATION
@@ -842,7 +842,11 @@ void conjugateGradientStep(data* sys) {
             alpha = current_line_search(sys, gradient, delta, 0.2, 0.5, 0.0001);
             #endif
         #endif
-
+        /* count1++;
+        printf("%d\n", count1);
+        if (count1 == 1000){
+            computeLandscape(sys);
+        } */
 
         compute_force(sys);
         new_gnorm = 0;
@@ -992,6 +996,7 @@ void fireStep(data* sys){
         sys->sites = jcv_diagram_get_sites(sys->diagram);
 
         compute_force(sys);
+        
         P = 0;
         fnorm = 0;
         vnorm = 0;
@@ -1004,10 +1009,11 @@ void fireStep(data* sys){
             vnorm += sys->velocities[i].x*sys->velocities[i].x + sys->velocities[i].y*sys->velocities[i].y;
         }
 
+
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
         if (count > 2500){
-            printf("fnorm = %.14Lf, vnorm = %Lf, P = %Lf, dt = %Lf, E = %Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
+            //printf("fnorm = %.14Lf, vnorm = %Lf, P = %Lf, dt = %Lf, E = %Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
             if (fnorm > 0.01){
                 if (count > 10000){
                     alpha_now = 1;
@@ -1029,7 +1035,8 @@ void fireStep(data* sys){
             //check_force(sys);
             //exit(3); 
         }
-
+        printf("fnorm = %.14Lf, vnorm = %Lf, P = %.16Lf, dt = %Lf, E = %.16Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
+        
 
         if (P > 0){
             n_pos++;
@@ -1061,8 +1068,12 @@ void fireStep(data* sys){
             addBoundary(sys, i);
         }
   
+    /* printf("%d\n", count);
+    if (count == 1002){
+        computeLandscape(sys);
+        exit(3);
+    } */
 
-    //printf("fnorm = %.12lf\n", fnorm);
     } while (fnorm/sys->L > 1e-11); // L = sqrt((float)N)
     
     loggers(sys);
