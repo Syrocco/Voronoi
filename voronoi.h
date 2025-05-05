@@ -49,6 +49,8 @@ struct parameter_
     jcv_real Kp;
     jcv_real T;
     jcv_real gamma_rate;
+    jcv_real rad;
+    jcv_real k;
     
 };
 

@@ -6,6 +6,20 @@
 #include "thermo.h"
 #include "logger.h"
 
+
+inline jcv_point harmonic_force(const jcv_point r, const jcv_real size, const jcv_real k){
+    jcv_real dist = jcv_lenght(&r);
+    if (dist > size) return (jcv_point){0, 0};
+    
+    jcv_real force = (k/size*size)*(1/size - 1/dist);
+    return jcv_mul(force, r);
+}
+
+inline jcv_point get_force_ji(const jcv_site* si, const jcv_graphedge* edgei, const parameter* param){
+    jcv_site* sj = edgei->neighbor;
+    jcv_point r = jcv_sub(sj->p, si->p);
+    return harmonic_force(r, 2*param->rad, param->k);
+}
 jcv_point force_h(const jcv_real A, const jcv_real Aj, const jcv_real P, const jcv_real Pj, const jcv_point* h7, const jcv_point* h2, const jcv_point* h3, const parameter* param){
     
     jcv_real h72 = jcv_point_dist(h2, h7);
@@ -187,9 +201,14 @@ void compute_force(data* sys){
         sys->forces[index] = get_edge_force_ii(sys->sites + i, sys->prefered_area[index], &sys->parameter); //∂Ei/∂ri
         jcv_graphedge* graph_edge = sys->sites[i].edges;
         while (graph_edge){ //looping over neighbors: graph_edge is in common between i and j
-            jcv_point force_ji = get_edge_force_ji(sys->sites + i, graph_edge, sys->prefered_area[graph_edge->neighbor->index], &sys->parameter); //∂Ej/∂ri
-            sys->forces[index].x += force_ji.x;                                   
-            sys->forces[index].y += force_ji.y;
+            jcv_point force_edge_ji = get_edge_force_ji(sys->sites + i, graph_edge, sys->prefered_area[graph_edge->neighbor->index], &sys->parameter); //∂Ej/∂ri
+            sys->forces[index].x += force_edge_ji.x;                                   
+            sys->forces[index].y += force_edge_ji.y;
+            if (sys->parameter.k != 0){
+                jcv_point force_ji = get_force_ji(sys->sites + i, graph_edge, &sys->parameter);
+                sys->forces[index].x += force_ji.x;                                   
+                sys->forces[index].y += force_ji.y;
+            }
             graph_edge = graph_edge->next;
         }
     }

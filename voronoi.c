@@ -19,24 +19,26 @@ int main(int argc, char *argv[]){
     init_genrand(0);
 
     data sys;
-    sys.parameter.qo = 3.9;
-    sys.parameter.Ka = 1;
+    sys.parameter.qo = 3.5;
+    sys.parameter.Ka = 0;
     sys.parameter.Kp = 1;
+    sys.parameter.rad = 0.25;
+    sys.parameter.k = 2;
 
     sys.size_large_over_small = 3.0/3.0;
     sys.n_frac_small = 0.5;
 
     sys.N = 300;
-    sys.M = 2; 
-    sys.dt = 1;
+    sys.M = 200000000; 
+    sys.dt = 0.001;
     sys.parameter.T = 0.0;
-    sys.parameter.gamma_rate = 0.01;
-    sys.gamma_max = 0.01;
-    sys.shear_start = 0;
+    sys.parameter.gamma_rate = 0.0001;
+    sys.gamma_max = 3;
+    sys.shear_start = 1;
     sys.dt_fire = 0.1;
     sys.shear_cycle = 0;
 
-    sys.info_snapshot.n_log = 1;
+    sys.info_snapshot.n_log = 100;
     sys.info_snapshot.n_start = 0;
     sys.info_snapshot.include_boundary = 0;
     sys.info_snapshot.compute_stress = 1;
@@ -54,7 +56,6 @@ int main(int argc, char *argv[]){
 
     
     constantInit(argc, argv, &sys);
-    
     jcv_diagram diagram;
     memset(&(diagram), 0, sizeof(jcv_diagram));
     jcv_point positions[9*sys.N]; //9*sys.N == max N_pbc
@@ -81,15 +82,16 @@ int main(int argc, char *argv[]){
     distribute_area(&sys);
     //random_area(&sys, 0.5, 1.5);
     rsaInitial(&sys, 0.4);
-    read_from_dump_initial(&sys, "N_300qo_3.900000gamma_5.000000gammarate_-0.000000Ka_0.000000v_2.dump", 0);
-
+    
+    //conjugateGradientStep(&sys);
+    fireStep(&sys);
     for (sys.i = 0; sys.i < sys.M; sys.i++){
         
         //backwardEulerStep(&sys);
-        //rkf45Step(&sys);
+        rkf45Step(&sys);
         //rk4Step(&sys);
         //eulerStep(&sys);
-        fireStep(&sys);
+        //fireStep(&sys);
         //conjugateGradientStep(&sys);
         
     }
@@ -131,20 +133,23 @@ void constantInit(int argc, char *argv[], data* sys){
         {"number", required_argument, NULL, 'N'},
         {"Po", required_argument, NULL, 'p'},
         {"Ao", required_argument, NULL, 'a'},
-        {"Ka", required_argument, NULL, 'k'},
+        {"Ka", required_argument, NULL, 'K'},
         {"Kp", required_argument, NULL, 'P'},
         {"dt", required_argument, NULL, 'D'},
         {"time", required_argument, NULL, 'M'},
         {"dL", required_argument, NULL, 'd'},
         {"temperature", required_argument, NULL, 'T'},
         {"gamma_max", required_argument, NULL, 'g'},
+        {"gamma_rate", required_argument, NULL, 'G'},
+        {"version", required_argument, NULL, 'v'},
+        {"k", required_argument, NULL, 'k'},
         {NULL, 0, NULL, 0}
     };
     
     int version = 1;
     int c;
     int control_dL = 0;
-    while ((c = getopt_long(argc, argv, "N:q:k:P:D:m:d:T:g:G:v:", longopt, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "N:q:K:P:D:m:d:T:g:G:v:k:", longopt, NULL)) != -1) {
         switch (c) {
             case 'N':
                 sscanf(optarg, "%d", &sys->N);
@@ -160,7 +165,7 @@ void constantInit(int argc, char *argv[], data* sys){
                     sys->parameter.qo = strtoflt128(optarg, NULL);
                 #endif
                 break;
-            case 'k':
+            case 'K':
                 #if JCV_type == 0
                     sscanf(optarg, "%f", &sys->parameter.Ka);
                 #elif JCV_type == 1
@@ -245,6 +250,17 @@ void constantInit(int argc, char *argv[], data* sys){
                 sscanf(optarg, "%d", &version);
                 init_genrand(version);
                 break;
+            case 'k':
+                #if JCV_type == 0
+                    sscanf(optarg, "%f", &(sys->parameter.k));
+                #elif JCV_type == 1
+                    sscanf(optarg, "%lf", &(sys->parameter.k));
+                #elif JCV_type == 2
+                    sscanf(optarg, "%Lf", &(sys->parameter.k));
+                #elif JCV_type == 3
+                    sys->parameter.k = strtoflt128(optarg, NULL);
+                #endif
+                break;
             default:
                 printf("Usage: %s [options]\n", argv[0]);
         }
@@ -269,7 +285,8 @@ void constantInit(int argc, char *argv[], data* sys){
         sys->shear_start /= sys->dt;
         sys->n_to_shear_max = round(sys->gamma_max/(sys->dt*sys->parameter.gamma_rate));
         sys->parameter.gamma_rate = sys->gamma_max/(sys->dt*sys->n_to_shear_max); //so that it's exactly gamma_max at the end
-        sys->parameter.gamma_rate *= -1; //because I'm reversing the shear at shear_start in integrator.c
+        if (sys->shear_cycle == 1)
+            sys->parameter.gamma_rate *= -1; //because I'm reversing the shear at shear_start in integrator.c
     }
     if (sys->info_snapshot.n_start == -1){
         sys->info_snapshot.n_start = sys->shear_start;
@@ -301,7 +318,7 @@ void constantInit(int argc, char *argv[], data* sys){
 
 	char filename[200];
     do {
-        sprintf(filename, "dump/N_%dqo_%Lfgamma_%Lfgammarate_%LfKa_%Lfv_%d", sys->N, (long double)sys->parameter.qo, (long double)sys->gamma_max, -(long double)sys->parameter.gamma_rate, (long double)sys->parameter.Ka, version);
+        sprintf(filename, "dump/N_%dqo_%Lfgamma_%Lfgammarate_%LfKa_%Lfv_%d", sys->N, (long double)sys->parameter.qo, (long double)sys->gamma_max, (long double)jcv_abs(sys->parameter.gamma_rate), (long double)sys->parameter.Ka, version);
         char snapshot_filename[256], thermo_filename[256], strobo_filename[256];
         sprintf(snapshot_filename, "%s.dump", filename);
         sprintf(thermo_filename, "%s.thermo", filename);
@@ -334,5 +351,6 @@ void constantInit(int argc, char *argv[], data* sys){
         fprintf(sys->info_strobo.file, "frac_active ");
     }
     fprintf(sys->info_strobo.file, "\n");
+   
 }
 

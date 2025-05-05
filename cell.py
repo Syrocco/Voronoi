@@ -12,8 +12,10 @@ from matplotlib.cm import ScalarMappable
 from mpl_toolkits.axes_grid1 import make_axes_locatable  # Add this import
 from glob import glob
 import imageio
+from matplotlib.collections import EllipseCollection
 cbar = None
 axval = None
+from scipy.interpolate import interp1d
 
 def polygon_area(vertices):
     """Calculate the area of a polygon using the Shoelace formula."""
@@ -38,7 +40,7 @@ def cellArray(loc, dump = False):
 class Cell(Dump):
     def __init__(self, loc, dump = True):
         self.loc = loc
-        if dump:
+        if dump and loc[-1] == "p":
             Dump.__init__(self, loc)
         self.extract_variables()
         self.L = np.sqrt(self.N)
@@ -46,30 +48,33 @@ class Cell(Dump):
             self.path = path = loc.split(".dump")[0]
         else:
             self.path = path = loc.split(".thermo")[0]
-            
-        if loc[-1] == "o":
-            path = loc
-        else:
-            path = self.path + ".thermo"
-            
-        self.stop = 0
-        with open(path, 'r') as file:
-            try:
-                first_line = file.readline().strip()
-                column_names = first_line.split()
+        
+        try:
+            if loc[-1] == "o":
+                path = loc
+            else:
+                path = self.path + ".thermo"
+                
+            self.stop = 0
+            with open(path, 'r') as file:
                 try:
-                    data = np.loadtxt(path, skiprows = 1)
+                    first_line = file.readline().strip()
+                    column_names = first_line.split()
+                    try:
+                        data = np.loadtxt(path, skiprows = 1)
+                    except:
+                        data = np.genfromtxt(path, skip_footer = 1, skip_header = 1)
+                        self.stop = 1
+        
+                    if data.ndim == 1:
+                        data = data.reshape(1, -1)
+        
+                    for i, col_name in enumerate(column_names):
+                        setattr(self, col_name, data[:, i])
                 except:
-                    data = np.genfromtxt(path, skip_footer = 1, skip_header = 1)
-                    self.stop = 1
-    
-                if data.ndim == 1:
-                    data = data.reshape(1, -1)
-    
-                for i, col_name in enumerate(column_names):
-                    setattr(self, col_name, data[:, i])
-            except:
-                print("could not recover .thermo")
+                    print("could not recover .thermo")
+        except:
+            print("could not recover .thermo")
                 
         if loc[-1] == "b":
             path = loc
@@ -200,6 +205,10 @@ class Cell(Dump):
         size = 3 
         x = self.get_atompropf("x")
         y = self.get_atompropf("y")
+        if "radius" in self.get_atomheader():
+            r = self.get_atompropf("radius")
+        else:
+            r = np.ones(len(x))*0.05
         # Add points around x and y in a sheared box with periodic boundary conditions
         mask1 = dL * y > L * (x - size)
         mask2 = y < size
@@ -226,33 +235,43 @@ class Cell(Dump):
             list(y[mask1 & mask4] - L) +
             list(y[mask3 & mask2] + L)
         )
-        X=np.array(list(x)+xadd)
-        Y=np.array(list(y)+yadd)
+        radd = (
+        list(r[mask1]) +
+        list(r[mask2]) +
+        list(r[mask3]) +
+        list(r[mask4]) +
+        list(r[mask1 & mask2]) +
+        list(r[mask3 & mask4]) +
+        list(r[mask1 & mask4]) +
+        list(r[mask3 & mask2])
+        )
+        X = np.array(list(x) + xadd)
+        Y = np.array(list(y) + yadd)
+        R = np.array(list(r) + radd)
+
         
         if prop == None:
-            return X, Y
+            return X, Y, R
         
         
         variables = re.findall(r'\b\w+\b', prop)
         local_vars = {var: self.get_atompropf(var) for var in variables}
     
-        # Evaluate the property expression
         try:
             c = eval(prop, {"__builtins__": None, "np": np}, local_vars)
         except Exception as e:
             raise ValueError(f"Error evaluating property expression '{prop}': {e}")
         
-        # cadd=list(c[x<size])+list(c[y<size])+list(c[np.logical_and(x<size,y<size)])+list(c[x>self.L-size])+list(c[y>self.L-size])+list(c[np.logical_and(x>self.L-size,y>self.L-size)])+list(c[np.logical_and(x<size,y>self.L-size)])+list(c[np.logical_and(x>self.L-size,y<size)])
-        cadd=list(c[dL*y>L*(x-size)])+list(c[y<size])+list(c[np.logical_and(dL*y>L*(x-size),y<size)])+list(c[dL*y<L*(x+size-L)])+list(c[y>L-size])+list(c[np.logical_and(dL*y<L*(x+size-L),y>L-size)])+list(c[np.logical_and(dL*y>L*(x-size),y>L-size)])+list(c[np.logical_and(dL*y<L*(x+size-L),y<size)])
-        C=np.array(list(c)+cadd)
-        return X,Y,C
+        cadd = list(c[dL*y>L*(x-size)])+list(c[y<size])+list(c[np.logical_and(dL*y>L*(x-size),y<size)])+list(c[dL*y<L*(x+size-L)])+list(c[y>L-size])+list(c[np.logical_and(dL*y<L*(x+size-L),y>L-size)])+list(c[np.logical_and(dL*y>L*(x-size),y>L-size)])+list(c[np.logical_and(dL*y<L*(x+size-L),y<size)])
+        C = np.array(list(c) + cadd)
+        return X, Y, R, C
     def voronoi(self, frame = -1, prop = "area", cmap = "cmocean:delta", fig = None, ax = None, shear = True, bar = True, quant = None):
         global cbar, axval
         
         if frame < 0:
             frame = self.nframes + frame
         self.jump_to_frame(frame)
-        X, Y, C = self.pbc(frame, prop)
+        X, Y, R, C = self.pbc(frame, prop)
         
         # Optimize colormap calculation
         C_norm = (C - np.min(C)) / (np.max(C) - np.min(C))
@@ -301,8 +320,24 @@ class Cell(Dump):
         pc = PolyCollection(polys, facecolors=colors, edgecolors='k', alpha=0.8)
         ax.add_collection(pc)
         
-        # Plot points once
-        ax.plot(X[:self.N], Y[:self.N], '.', c='k')
+
+        #ax.plot(X[:self.N], Y[:self.N], '.', c='k')
+
+        widths = 2*R[:self.N] 
+        heights = 2*R[:self.N]
+
+        circles = EllipseCollection(
+            widths, heights, 
+            np.zeros_like(widths),
+            offsets=np.column_stack((X[:self.N], Y[:self.N])),
+            units='x',
+            edgecolors='none',
+            facecolors='k',
+            linewidths=0.5,
+            transOffset=ax.transData
+        )
+        ax.add_collection(circles)
+
         if shear:
             ax.set_xlim(-self.L*self.gamma, self.L*(1 + self.gamma))
         else:
@@ -392,9 +427,169 @@ class Cell(Dump):
             ]
             subprocess.run(ffmpeg_cmd, check=True)
 
+if 0:
+    cells = cellArray("/mnt/ssd/Documents/Voronoi/data/simple shear/test/rk0003/*.thermo", False)
+    for i in range(len(cells)):
+        cell = cells[i]
+        plt.plot(cell.gamma_actual, cell.shear)
+    plt.ylabel(r"$\sigma_{xy}$")
+    plt.xlabel(r"$\gamma$")
 
+if 1:
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    plt.subplots_adjust(hspace=1)
+
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/soft core/fire 0.1/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    X = np.zeros((len(allData), 61500))*np.nan
+    g = []
+    for i, cell in enumerate(cells):
+        stress = cell.shear
+        X[i, :len(stress)] = stress
+        if len(cell.gamma_actual) > len(g):
+            g = cell.gamma_actual
+    ax.plot(g, np.nanmean(X, axis = 0)[:len(g)], label = r"fire $dt_{max} = 0.1$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    
+    
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/soft core/fire 0.01/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    X = np.zeros((len(allData), 61500))*np.nan
+    g = []
+    for i, cell in enumerate(cells):
+        stress = cell.shear
+        X[i, :len(stress)] = stress
+        if len(cell.gamma_actual) > len(g):
+            g = cell.gamma_actual
+    ax.plot(g, np.nanmean(X, axis = 0)[:len(g)], label = r"fire $dt_{max} = 0.01$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/soft core/rk/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    
+    all_times = [cell.gamma_actual for cell in cells]  
+    common_time = np.linspace(0, max([times[-1] for times in all_times]), 1500) 
+    interpolated_X = np.zeros((len(cells), len(common_time))) * np.nan
+    for i, (cell, times) in enumerate(zip(cells, all_times)):
+        stress = cell.shear
+        interp_func = interp1d(times, stress, bounds_error=False, fill_value=np.nan)
+        interpolated_X[i, :] = interp_func(common_time)
+    
+    mean_stress = np.nanmean(interpolated_X, axis=0)
+    
+    ax.plot(common_time, mean_stress, label = r"continuous time, rk45 adaptative,  $\gamma_{dot}=0.001$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    """for i in range(2):
+        ax[1].plot(cells[i].gamma_actual, cells[i].shear, alpha = 0.5)
+    ax[1].set_ylabel(r"$\sigma_{xy}$")
+    ax[1].set_xlabel(r"$\gamma$")"""
+    ax.legend()
+    
+    
+if 0:
+    fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+    plt.subplots_adjust(hspace=1)
+
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/simple shear/test/0.1/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    X = np.zeros((len(allData), 61500))*np.nan
+    for i, cell in enumerate(cells):
+        stress = cell.shear
+        X[i, :len(stress)] = stress
+    g = np.linspace(0, 0.0025*len(X[0]), len(X[0]))
+    ax.plot(g, np.nanmean(X, axis = 0), label = r"fire $dt_{max} = 0.1$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    
+    
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/simple shear/test/0.01/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    X = np.zeros((len(allData), 5000))*np.nan
+    for i, cell in enumerate(cells):
+        stress = cell.shear
+        X[i, :len(stress)] = stress
+    g = np.linspace(0, 0.0025*len(X[0]), len(X[0]))
+    ax.plot(g, np.nanmean(X, axis = 0), label = r"fire $dt_{max} = 0.01$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    """for i in range(0, 20):
+        ax[1].plot(g, X[i], alpha = 0.5)
+    ax[1].set_ylabel(r"$\sigma_{xy}$")
+    ax[1].set_xlabel(r"$\gamma$")
+    ax[1].set_title(r"Shear stress for 4 different realizations")"""
+    
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/simple shear/test/rk003/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    
+    all_times = [cell.gamma_actual for cell in cells]  
+    common_time = np.linspace(0, max([times[-1] for times in all_times]), 1500) 
+    interpolated_X = np.zeros((len(cells), len(common_time))) * np.nan
+    for i, (cell, times) in enumerate(zip(cells, all_times)):
+        stress = cell.shear
+        interp_func = interp1d(times, stress, bounds_error=False, fill_value=np.nan)
+        interpolated_X[i, :] = interp_func(common_time)
+    
+    mean_stress = np.nanmean(interpolated_X, axis=0)
+    
+    ax.plot(common_time, mean_stress, label = r"continuous time, rk45 adaptative,  $\gamma_{dot}=0.003$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    """for i in range(2):
+        ax[1].plot(cells[i].gamma_actual, cells[i].shear, alpha = 0.5)
+    ax[1].set_ylabel(r"$\sigma_{xy}$")
+    ax[1].set_xlabel(r"$\gamma$")"""
+    ax.legend()
+    plt.show()
+    
+    
+    allData = glob("/mnt/ssd/Documents/Voronoi/data/simple shear/test/rk0003/*.thermo")
+    
+    cells = [Cell(data, dump = False) for data in allData]
+    
+    all_times = [cell.gamma_actual for cell in cells]  
+    common_time = np.linspace(0, max([times[-1] for times in all_times]), 1500) 
+    interpolated_X = np.zeros((len(cells), len(common_time))) * np.nan
+    for i, (cell, times) in enumerate(zip(cells, all_times)):
+        stress = cell.shear
+        interp_func = interp1d(times, stress, bounds_error=False, fill_value=np.nan)
+        interpolated_X[i, :] = interp_func(common_time)
+    
+    mean_stress = np.nanmean(interpolated_X, axis=0)
+    
+    ax.plot(common_time, mean_stress, label = r"continuous time, rk45 adaptative,  $\gamma_{dot}=0.0003$")
+    ax.set_ylabel(r"$\sigma_{xy}$")
+    ax.set_xlabel(r"$\gamma$")
+    ax.set_title(r"Mean shear stress")
+    """for i in range(2):
+        ax[1].plot(cells[i].gamma_actual, cells[i].shear, alpha = 0.5)
+    ax[1].set_ylabel(r"$\sigma_{xy}$")
+    ax[1].set_xlabel(r"$\gamma$")"""
+    ax.legend()
+    plt.show()
 
 if 0:
+    cell = "1"
     x, y, a = cell.pbc(0, "perimeter")
     points = np.vstack((x, y)).T
     vor = Voronoi(points, qhull_options="Qc")
@@ -444,7 +639,7 @@ if 0:
     fxa = np.loadtxt("/home/syrocco/Downloads/a.txt", skiprows = 1, delimiter=",")[:, 4]
     diff = (fx - fxa)/fx
     print(np.round(diff, 2))
-if 1:
+if 0:
     x = np.genfromtxt("landscape.txt", dtype='str')
     X = x[:, 0].astype(np.float128)
     Y = x[:, 1].astype(np.float128)
@@ -457,10 +652,10 @@ if 1:
     plt.xlabel("distance to starting point")
     plt.ylabel("E")
 if 0:      
-    cell = Cell("/mnt/ssd/Documents/Voronoi/dump/N_300qo_3.400000gamma_0.500000gammarate_-0.000000Ka_0.000000v_1.dump")
-    cell.voronoi(frame = -2, shear = True)
+    cell = Cell("/mnt/ssd/Documents/Voronoi/data/simple shear/test/0.01/N_300qo_3.900000dt_0.010000gamma_3.000000gammarate_-0.002500Ka_0.000000v_10.dump")
+    #cell.voronoi(frame = -2, shear = True)
     'cmasher:pepper'
-    #a.save("shear", cmap ='jet', start = 2000, end = 2100, bar = False, shear = True, overide=False, frame_rate = 20, quant = None)
+    cell.save("shear", cmap ='jet', bar = False, shear = True, overide=False, frame_rate = 2, quant = None)
 
 
 if 0:

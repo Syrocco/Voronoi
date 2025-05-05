@@ -16,7 +16,7 @@ void loggers(data* sys){
         computeThermo(sys);
     }
 
-    if ((sys->i - sys->info_strobo.n_start)%(sys->info_strobo.n_log) == 0 
+    if (sys->shear_cycle &&(sys->i - sys->info_strobo.n_start)%(sys->info_strobo.n_log) == 0 
          && sys->i >= sys->info_strobo.n_start){
         computeStrobo(sys);
     }
@@ -27,7 +27,7 @@ void computeThermo(data* sys){
     
     jcv_real E = energy_total(sys)/sys->N;
     fprintf(sys->info_thermo.file, "%d %Lf %.16Lf %Lf ", sys->i, (long double)sys->time, (long double)E, (long double)sys->gamma);
-    printf("i = %d, dt = %Lf, E = %.16Lf, γ = %.16Lf ", sys->i, (long double)sys->dt, (long double)E, (long double)sys->gamma);
+    printf("i = %d, dt = %Lf, E = %.16Lf, γ = %.6Lf ", sys->i, (long double)sys->dt, (long double)E, (long double)sys->gamma);
 
     if (sys->info_thermo.compute_stress){
         jcv_real stress[2][2];
@@ -35,7 +35,7 @@ void computeThermo(data* sys){
         jcv_real shear_stress = (stress[0][1] + stress[1][0])/2;
         jcv_real pressure = (stress[0][0] + stress[1][1])/2;
         fprintf(sys->info_thermo.file, "%.16Lf %.16Lf ", (long double)pressure, (long double)shear_stress);
-        printf("P = %Lf, shear = %Lf ", (long double)pressure, (long double)shear_stress);
+        printf("P = %.16Lf, shear = %.16Lf ", (long double)pressure, (long double)shear_stress);
     }
     
     if (sys->info_thermo.compute_dist_travelled){
@@ -113,12 +113,18 @@ void saveTXT(data* sys){
 
  
 
-    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%.16Lf %.16Lf %.16Lf\n0 %.16Lf 0\n0 0 0\nITEM: ATOMS id prefered_area x y fx fy ", m, NN, (long double)jcv_min(0, dL), (long double)jcv_max(L, L + dL), (long double)dL, (long double)L);
+    fprintf(file, "ITEM: TIMESTEP\n%d\nITEM: NUMBER OF ATOMS\n%d\nITEM: BOX BOUNDS xy xz yz\n%.16Lf %.16Lf %.16Lf\n0 %.16Lf 0\n0 0 0\nITEM: ATOMS id prefered_area x y fx fy radius ", m, NN, (long double)jcv_min(0, dL), (long double)jcv_max(L, L + dL), (long double)dL, (long double)L);
     if (sys->info_snapshot.compute_stress){
         fprintf(file, "shear ");
         for (int i = 0; i < N_pbc; i++){
             if (sys->sites[i].index >= N) continue;
-            stress_unique(sys, i, stress[sys->sites[i].index]);
+            jcv_real temp_stress[2][2];
+            stress_unique_force(sys, i, temp_stress);
+            stress_unique_cell(sys, i, stress[sys->sites[i].index]);
+            stress[sys->sites[i].index][0][0] += temp_stress[0][0];
+            stress[sys->sites[i].index][0][1] += temp_stress[0][1];
+            stress[sys->sites[i].index][1][0] += temp_stress[1][0];
+            stress[sys->sites[i].index][1][1] += temp_stress[1][1];
         }
     }
     if (sys->info_snapshot.compute_dist_travelled){
@@ -159,7 +165,7 @@ void saveTXT(data* sys){
             fprintf(file, "\n");
         }
         else{
-            fprintf(file, "%d %.16Lf %.16Lf %.16Lf %.16Lf %.16Lf ", i, (long double)a[i], (long double)p[i].x, (long double)p[i].y, (long double)f[i].x, (long double)f[i].y);
+            fprintf(file, "%d %.16Lf %.16Lf %.16Lf %.16Lf %.16Lf %.4Lf ", i, (long double)a[i], (long double)p[i].x, (long double)p[i].y, (long double)f[i].x, (long double)f[i].y, (long double)sys->parameter.rad);
             if (sys->info_snapshot.compute_stress){
                 fprintf(file, "%.16Lf ", (long double)(stress[i][0][1] + stress[i][1][0])/2);
             }

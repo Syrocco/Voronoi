@@ -16,8 +16,8 @@ CXXFLAGS_PROFILE = -pg -Wall -Wno-float-equal -Wextra -std=c11
 LDFLAGS_PROFILE = -lm  -lquadmath
 
 TARGET = voronoi
-SRC = voronoi.c helper.c force.c initial.c integrator.c logger.c thermo.c parser.c
-HEADERS = helper.h force.h voronoi.h initial.h integrator.h jc_voronoi.h logger.h thermo.h parser.h
+SRC = helper.c force.c voronoi.c initial.c integrator.c logger.c thermo.c parser.c
+HEADERS = jc_voronoi.h helper.h force.h voronoi.h initial.h integrator.h logger.h thermo.h parser.h
 
 .PHONY: all default debug full_debug clean
 

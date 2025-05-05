@@ -226,8 +226,8 @@ void rkf45Step(data* sys) {
     jcv_point k1[sys->N], k2[sys->N], k3[sys->N], k4[sys->N], k5[sys->N], k6[sys->N];
     jcv_point initial_positions[sys->N];
     jcv_real error, dt_new;
-    const jcv_real tolerance = 1e-4;
-    const jcv_real safety = 0.9;
+    const jcv_real tolerance = 1e-6;
+    const jcv_real safety = 0.7;
     const jcv_real min_dt = 1e-10;
     const jcv_real max_dt = 1.0;
 
@@ -1013,7 +1013,7 @@ void fireStep(data* sys){
         fnorm = JCV_SQRT(fnorm);
         vnorm = JCV_SQRT(vnorm);
         if (count > 2500){
-            //printf("fnorm = %.14Lf, vnorm = %Lf, P = %Lf, dt = %Lf, E = %Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
+            printf("fnorm = %.14Lf, vnorm = %Lf, P = %Lf, dt = %Lf, E = %Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
             if (fnorm > 0.01){
                 if (count > 10000){
                     alpha_now = 1;
@@ -1035,7 +1035,7 @@ void fireStep(data* sys){
             //check_force(sys);
             //exit(3); 
         }
-        printf("fnorm = %.14Lf, vnorm = %Lf, P = %.16Lf, dt = %Lf, E = %.16Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
+        //printf("fnorm = %.14Lf, vnorm = %Lf, P = %.16Lf, dt = %Lf, E = %.16Lf\n", (long double)fnorm, (long double)vnorm, (long double)P, (long double)dt_now, (long double)energy_total(sys));
         
 
         if (P > 0){
@@ -1074,7 +1074,7 @@ void fireStep(data* sys){
         exit(3);
     } */
 
-    } while (fnorm/sys->L > 1e-11); // L = sqrt((float)N)
+    } while (fnorm/sys->L > 1e-8); // L = sqrt((float)N)
     
     loggers(sys);
 

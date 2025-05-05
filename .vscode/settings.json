@@ -26,6 +26,15 @@
         "string_view": "c",
         "span": "c",
         "iterator": "c",
-        "vector": "c"
+        "vector": "c",
+        "atomic": "c",
+        "bitset": "c",
+        "memory": "c",
+        "functional": "c",
+        "memory_resource": "c",
+        "tuple": "c",
+        "__config": "c",
+        "__tree": "c",
+        "deque": "c"
     }
 }
